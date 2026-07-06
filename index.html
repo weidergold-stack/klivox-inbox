@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Klivox · Bandeja WhatsApp</title>
+<style>
+  :root{--bg:#0a0f1c;--panel:#111a2e;--panel2:#0d1526;--brd:rgba(255,255,255,.09);--txt:#e9eefb;--muted:#8a98b8;--cyan:#22d3ee;--blue:#3b82f6;--green:#25d366;--grad:linear-gradient(120deg,#3b82f6,#22d3ee)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);height:100vh;overflow:hidden}
+  .hidden{display:none!important}
+  /* login */
+  #login{height:100vh;display:grid;place-items:center}
+  .card{background:var(--panel);border:1px solid var(--brd);border-radius:18px;padding:34px;width:340px;max-width:92vw;text-align:center}
+  .logo{width:52px;height:52px;border-radius:14px;background:var(--grad);display:grid;place-items:center;margin:0 auto 16px;font-weight:800;font-size:24px;color:#04121f}
+  .card h1{font-size:19px;margin-bottom:4px}
+  .card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+  input,textarea{font-family:inherit;background:var(--panel2);border:1px solid var(--brd);border-radius:11px;color:var(--txt);outline:none;font-size:14px}
+  #login input{width:100%;padding:12px 14px;margin-bottom:12px}
+  #login input:focus,textarea:focus{border-color:var(--cyan)}
+  .btn{background:var(--grad);border:none;color:#04121f;font-weight:700;font-family:inherit;font-size:14px;padding:12px 18px;border-radius:11px;cursor:pointer;width:100%}
+  .err{color:#fca5a5;font-size:12.5px;margin-top:8px;min-height:16px}
+  /* app */
+  #app{display:grid;grid-template-columns:320px 1fr;height:100vh}
+  .side{border-right:1px solid var(--brd);background:var(--panel2);display:flex;flex-direction:column;min-height:0}
+  .side-h{padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px}
+  .side-h .logo{width:36px;height:36px;margin:0;font-size:18px;border-radius:10px}
+  .side-h b{font-size:15px}.side-h small{display:block;color:var(--cyan);font-size:11px}
+  .side-h .refresh{margin-left:auto;background:none;border:1px solid var(--brd);color:var(--muted);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:12px}
+  .convs{overflow-y:auto;flex:1;min-height:0}
+  .conv{padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;display:flex;gap:11px;align-items:center}
+  .conv:hover{background:rgba(255,255,255,.03)}
+  .conv.active{background:rgba(34,211,238,.09)}
+  .av{flex:0 0 40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:grid;place-items:center;font-weight:700;font-size:15px;color:#04121f}
+  .conv .meta{flex:1;min-width:0}
+  .conv .meta .top{display:flex;justify-content:space-between;gap:8px}
+  .conv .name{font-size:14px;font-weight:600;white-space:nowrap}
+  .conv .time{font-size:11px;color:var(--muted);flex:0 0 auto}
+  .conv .last{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .conv .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:0 0 auto}
+  /* thread */
+  .main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+  .main-h{padding:15px 20px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:12px;background:var(--panel2)}
+  .main-h .name{font-size:15px;font-weight:600}.main-h .num{font-size:12px;color:var(--muted)}
+  .empty{flex:1;display:grid;place-items:center;color:var(--muted);text-align:center;padding:30px}
+  .thread{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:9px;min-height:0}
+  .bub{max-width:70%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.45;word-wrap:break-word}
+  .bub .t{display:block;font-size:10px;color:var(--muted);margin-top:4px;text-align:right}
+  .in{align-self:flex-start;background:var(--panel);border:1px solid var(--brd);border-bottom-left-radius:4px}
+  .out{align-self:flex-end;background:#075e54;border-bottom-right-radius:4px}
+  .out .t{color:#bfeadf}
+  .composer{border-top:1px solid var(--brd);padding:12px 16px;background:var(--panel2)}
+  .win-warn{font-size:12px;color:#fcd34d;margin-bottom:8px;display:none}
+  .composer .row{display:flex;gap:10px;align-items:flex-end}
+  .composer textarea{flex:1;resize:none;padding:11px 14px;max-height:120px;min-height:44px}
+  .composer .send{background:var(--grad);border:none;width:46px;height:44px;border-radius:11px;cursor:pointer;color:#04121f;font-size:18px;flex:0 0 auto}
+  .send-err{font-size:12px;color:#fca5a5;margin-top:6px;min-height:14px}
+  @media(max-width:760px){#app{grid-template-columns:1fr}.side{display:none}.side.show{display:flex;position:absolute;inset:0;z-index:5;width:100%}}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card">
+    <div class="logo">K</div>
+    <h1>Bandeja WhatsApp</h1>
+    <p>Klivox Automatizaciones</p>
+    <input id="pass" type="password" placeholder="Contraseña de acceso" autocomplete="current-password"/>
+    <button class="btn" onclick="login()">Entrar</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="side" id="side">
+    <div class="side-h">
+      <div class="logo">K</div>
+      <div><b>Klivox</b><small>● WhatsApp</small></div>
+      <button class="refresh" onclick="load()">↻</button>
+    </div>
+    <div class="convs" id="convs"></div>
+  </div>
+  <div class="main">
+    <div class="main-h" id="mainH"><span class="name">Selecciona una conversación</span></div>
+    <div class="empty" id="empty">💬 Elige un chat a la izquierda para ver y responder los mensajes.</div>
+    <div class="thread hidden" id="thread"></div>
+    <div class="composer hidden" id="composer">
+      <div class="win-warn" id="winWarn">⚠️ Han pasado más de 24 h desde el último mensaje del paciente. WhatsApp solo permite responder con una plantilla aprobada.</div>
+      <div class="row">
+        <textarea id="reply" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+        <button class="send" onclick="send()">➤</button>
+      </div>
+      <div class="send-err" id="sendErr"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let PASS=localStorage.getItem('kv_pass')||'';
+let messages=[], convs={}, current=null;
+
+function hdr(){return{'x-inbox-pass':PASS,'Content-Type':'application/json'}}
+function fmtNum(n){return (n||'').replace('whatsapp:','')}
+function fmtTime(d){const t=new Date(d);const now=new Date();const sameDay=t.toDateString()===now.toDateString();
+  return sameDay? t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : t.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit'})+' '+t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
+
+async function login(){
+  PASS=document.getElementById('pass').value.trim();
+  document.getElementById('loginErr').textContent='';
+  const r=await fetch('/api/messages',{headers:hdr()});
+  if(r.status===401){document.getElementById('loginErr').textContent='Contraseña incorrecta.';return;}
+  localStorage.setItem('kv_pass',PASS);
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  await load();setInterval(load,8000);
+}
+
+async function load(){
+  try{
+    const r=await fetch('/api/messages',{headers:hdr()});
+    if(r.status===401){logout();return;}
+    const d=await r.json();
+    messages=d.messages||[];
+    convs={};
+    for(const m of messages){
+      const other = (m.direction==='inbound')? fmtNum(m.from) : fmtNum(m.to);
+      if(!convs[other]) convs[other]={num:other,msgs:[]};
+      convs[other].msgs.push(m);
+    }
+    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));
+    renderConvs();
+    if(current&&convs[current]) renderThread(current);
+  }catch(e){}
+}
+
+function lastInbound(c){let t=0;for(const m of c.msgs){if(m.direction==='inbound'){const x=new Date(m.date).getTime();if(x>t)t=x}}return t}
+
+function renderConvs(){
+  const list=Object.values(convs).sort((a,b)=> new Date(b.msgs[b.msgs.length-1].date)-new Date(a.msgs[a.msgs.length-1].date));
+  const el=document.getElementById('convs');
+  el.innerHTML=list.map(c=>{
+    const last=c.msgs[c.msgs.length-1];
+    const unread = last.direction==='inbound';
+    return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
+      <div class="av">${c.num.slice(-2)}</div>
+      <div class="meta"><div class="top"><span class="name">${c.num}</span><span class="time">${fmtTime(last.date)}</span></div>
+      <div class="last">${(last.direction!=='inbound'?'Tú: ':'')+((last.body||'').replace(/</g,'&lt;')||'—')}</div></div>
+      ${unread?'<span class="dot"></span>':''}
+    </div>`}).join('') || '<div style="padding:24px;color:#8a98b8;font-size:13px">Aún no hay conversaciones. Cuando alguien escriba a tu WhatsApp aparecerá aquí.</div>';
+}
+
+function open_(num){current=num;renderConvs();renderThread(num);
+  document.getElementById('side').classList.remove('show');}
+
+function renderThread(num){
+  const c=convs[num];if(!c)return;
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('thread').classList.remove('hidden');
+  document.getElementById('composer').classList.remove('hidden');
+  document.getElementById('mainH').innerHTML=`<div class="av" style="width:36px;height:36px;font-size:14px">${num.slice(-2)}</div><div><div class="name">${num}</div><div class="num">WhatsApp</div></div>`;
+  const th=document.getElementById('thread');
+  th.innerHTML=c.msgs.map(m=>{const cls=m.direction==='inbound'?'in':'out';
+    return `<div class="bub ${cls}">${(m.body||'').replace(/</g,'&lt;')||'<i>(sin texto)</i>'}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
+  th.scrollTop=th.scrollHeight;
+  const hrs=(Date.now()-lastInbound(c))/36e5;
+  document.getElementById('winWarn').style.display = (hrs>24||lastInbound(c)===0)?'block':'none';
+}
+
+async function send(){
+  if(!current)return;
+  const ta=document.getElementById('reply');const text=ta.value.trim();if(!text)return;
+  document.getElementById('sendErr').textContent='';
+  ta.value='';
+  const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,body:text})});
+  const d=await r.json();
+  if(!d.ok){document.getElementById('sendErr').textContent = d.code===63016 ? 'Fuera de la ventana de 24 h: se requiere una plantilla aprobada.' : ('No se pudo enviar: '+(d.error||'error'));ta.value=text;}
+  await load();
+}
+
+function logout(){localStorage.removeItem('kv_pass');location.reload();}
+
+// auto-login if stored
+if(PASS){document.getElementById('pass').value=PASS;login();}
+</script>
+</body>
+</html>
