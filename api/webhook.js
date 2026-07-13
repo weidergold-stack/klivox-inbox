@@ -12,6 +12,7 @@
 const HUMAN_WINDOW_MIN = 3;      // si tu respondiste hace <3 min, el bot no interviene
 const HISTORY_MAX = 12;          // turnos de contexto que se le pasan a Claude
 const MODEL = 'claude-haiku-4-5-20251001';
+const BOT_MARK = '\u200B'; // marca invisible: distingue respuestas del bot de las manuales
 
 // ============================================================================
 // BASE DE CONOCIMIENTO — edita este bloque para "alimentar" al bot.
@@ -90,19 +91,20 @@ module.exports = async (req, res) => {
     // 2) Backoff humano: si hay un outbound reciente, el bot no interviene
     const now = Date.now();
     const windowMs = HUMAN_WINDOW_MIN * 60 * 1000;
-    const recentOutbound = msgs.some(m => {
+    const recentHumanOutbound = msgs.some(m => {
       const isOut = (m.direction || '').startsWith('outbound');
+      const isBot = (m.body || '').includes(BOT_MARK);
       const ts = m.date_sent || m.date_created;
       const t = ts ? new Date(ts).getTime() : 0;
-      return isOut && (now - t) < windowMs;
+      return isOut && !isBot && (now - t) < windowMs;
     });
-    if (recentOutbound) return done(); // hay un humano atendiendo
+    if (recentHumanOutbound) return done(); // solo se aparta si un HUMANO respondio desde la bandeja
 
     // 3) Armar historial para Claude (cronologico, alternando roles)
     let hist = msgs
       .map(m => ({
         role: (m.direction || '').startsWith('inbound') ? 'user' : 'assistant',
-        text: (m.body || '').trim(),
+        text: (m.body || '').replace(BOT_MARK, '').trim(),
         t: m.date_created ? new Date(m.date_created).getTime() : 0
       }))
       .filter(m => m.text)
@@ -145,7 +147,7 @@ module.exports = async (req, res) => {
     }
 
     // 5) Enviar por Twilio REST
-    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply });
+    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK });
     await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
       method: 'POST',
       headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
