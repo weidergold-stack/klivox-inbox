@@ -52,6 +52,7 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Haz preguntas para entender el proyecto del prospecto antes de proponer soluciones.
 - Ante urgencias, quejas, solicitud de agendar, pedido de precio/cotizacion, o cualquier tema complejo o sensible: NO inventes datos; traslada a un asesor con calidez, avisa que le contactara muy pronto y pide su nombre y en que puede ayudarle.
 - Nunca prometas cosas que no sabes ni des precios especificos.
+- No uses formato Markdown ni asteriscos para negritas (** o *); WhatsApp no los interpreta y se ven feos. Escribe en texto plano y natural.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia una conversacion con el equipo.`;
 // ============================================================================
 
@@ -146,7 +147,8 @@ module.exports = async (req, res) => {
       } catch (_) { /* usa el mensaje de respaldo */ }
     }
 
-    // 5) Enviar por Twilio REST
+    // 5) Limpiar formato Markdown que WhatsApp no interpreta y enviar por Twilio REST
+    reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
     const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK });
     await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
       method: 'POST',
