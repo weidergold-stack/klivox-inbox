@@ -81,6 +81,19 @@
   .tpl-item .tm{font-size:12.5px;color:var(--muted);white-space:pre-wrap}
   .tpl-item .del{float:right;color:#fca5a5;font-size:12px;cursor:pointer;border:none;background:none}
   .muted-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+  .sec-title{font-size:12px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 9px}
+  .sec-title:first-of-type{margin-top:6px}
+  .badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;vertical-align:middle;margin-left:6px}
+  .badge.ok{background:rgba(37,211,102,.16);color:#4ade80;border:1px solid rgba(37,211,102,.4)}
+  .badge.wait{background:rgba(252,211,77,.14);color:#fcd34d;border:1px solid rgba(252,211,77,.4)}
+  .badge.no{background:rgba(252,165,165,.14);color:#fca5a5;border:1px solid rgba(252,165,165,.4)}
+  .tpl-item.meta{border-left:3px solid var(--brd)}
+  .tpl-item.meta.ok{border-left-color:#25d366}
+  .tpl-item.meta.wait{border-left-color:#fcd34d}
+  .tpl-item.meta.no{border-left-color:#fca5a5}
+  .tpl-item.meta.locked{opacity:.6;cursor:not-allowed}
+  .tpl-item .btns{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+  .tpl-item .btns span{font-size:11px;color:var(--muted);border:1px solid var(--brd);border-radius:7px;padding:2px 8px}
   /* ---- MOBILE ---- */
   @media(max-width:760px){
     #app{grid-template-columns:1fr;position:relative}
@@ -138,7 +151,7 @@
 
 <script>
 let PASS=localStorage.getItem('kv_pass')||'';
-let messages=[], convs={}, current=null;
+let messages=[], convs={}, current=null, metaTemplates=[];
 let names=JSON.parse(localStorage.getItem('kv_names')||'{}');
 let contacts=JSON.parse(localStorage.getItem('kv_contacts')||'[]');
 let templates=JSON.parse(localStorage.getItem('kv_templates')||'null');
@@ -168,7 +181,16 @@ async function login(){
   localStorage.setItem('kv_pass',PASS);
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  await load();setInterval(load,8000);
+  await load();loadMetaTemplates();setInterval(load,8000);setInterval(loadMetaTemplates,60000);
+}
+
+async function loadMetaTemplates(){
+  try{
+    const r=await fetch('/api/templates',{headers:hdr()});
+    if(!r.ok)return;
+    const d=await r.json();
+    metaTemplates=d.templates||[];
+  }catch(e){}
 }
 
 async function load(){
@@ -281,6 +303,25 @@ function renameContact(num){
 }
 
 /* ---- Plantillas ---- */
+const badgeInfo={approved:['ok','● Aprobada'],pending:['wait','● En revisión'],rejected:['no','● Rechazada']};
+function metaPreview(t){
+  const nm=current?nameOf(current).split(' ')[0]:'';
+  let b=(t.body||'').replace(/\{\{\s*1\s*\}\}/g, nm||'{{1}}');
+  return b;
+}
+function renderMetaTemplates(){
+  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Se crean en Twilio y aparecen aquí con su estado.</div>';
+  return metaTemplates.map((t,i)=>{
+    const bi=badgeInfo[t.status]||badgeInfo.pending;
+    const locked=t.status!=='approved';
+    const btns=(t.buttons&&t.buttons.length)?`<div class="btns">${t.buttons.map(b=>'<span>'+esc(b)+'</span>').join('')}</div>`:'';
+    const onclick=locked?'':`onclick="sendMetaTemplate(${i})"`;
+    return `<div class="tpl-item meta ${bi[0]} ${locked?'locked':''}" ${onclick}>
+      <div class="tt">${esc(t.name)}<span class="badge ${bi[0]}">${bi[1]}</span></div>
+      <div class="tm">${esc(metaPreview(t))}</div>${btns}
+    </div>`;
+  }).join('');
+}
 function openTemplates(){
   const items=templates.map((t,i)=>`
     <div class="tpl-item" onclick="useTemplate(${i})">
@@ -289,11 +330,25 @@ function openTemplates(){
     </div>`).join('') || '<div class="muted-note">No hay plantillas aún.</div>';
   document.getElementById('modalRoot').innerHTML=`
    <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
-    <h2>Plantillas de respuesta</h2>
+    <h2>Plantillas</h2>
+    <div class="sec-title">Plantillas de Meta (fuera de 24 h)</div>
+    ${renderMetaTemplates()}
+    <div class="sec-title">Respuestas rápidas (dentro de 24 h)</div>
     ${items}
-    <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">＋ Nueva plantilla</button>
-    <div class="muted-note">Toca una plantilla para insertarla en el mensaje. Usa <b>{nombre}</b> y se reemplaza por el nombre del contacto.</div>
+    <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">＋ Nueva respuesta rápida</button>
+    <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
    </div></div>`;
+}
+async function sendMetaTemplate(i){
+  const t=metaTemplates[i];if(!t||t.status!=='approved')return;
+  if(!current){alert('Abre o crea un chat primero.');return;}
+  const nm=nameOf(current).split(' ')[0]||'Hola';
+  const variables=t.varCount>0?{"1":nm}:null;
+  closeModal();
+  const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,contentSid:t.sid,variables})});
+  const d=await r.json();
+  if(!d.ok){document.getElementById('sendErr').textContent='No se pudo enviar la plantilla: '+(d.error||'error');}
+  await load();
 }
 function useTemplate(i){
   const t=templates[i];if(!t)return;
