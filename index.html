@@ -66,6 +66,10 @@
   .composer .send{background:var(--grad);width:50px;color:#04121f;font-size:19px}
   .composer .tpl{width:46px;background:var(--panel3);color:var(--cyan);font-size:18px;border:1px solid var(--brd)}
   .send-err{font-size:12px;color:#fca5a5;margin-top:6px;min-height:14px}
+  .composer.locked textarea{opacity:.45;cursor:not-allowed;background:var(--panel3)}
+  .composer.locked .send{opacity:.35;cursor:not-allowed;filter:grayscale(1)}
+  .composer.locked .tpl{background:var(--grad);color:#04121f;border:none;animation:tplpulse 1.8s infinite}
+  @keyframes tplpulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.55)}70%{box-shadow:0 0 0 8px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
   /* modal / sheet */
   .overlay{position:fixed;inset:0;background:rgba(3,7,18,.72);z-index:40;display:flex;align-items:center;justify-content:center;padding:18px}
   .modal{background:var(--panel);border:1px solid var(--brd);border-radius:16px;padding:22px;width:400px;max-width:100%;max-height:88dvh;overflow-y:auto}
@@ -136,7 +140,7 @@
     <div class="empty" id="empty">💬 Elige un chat o crea uno nuevo con ✚</div>
     <div class="thread hidden" id="thread"></div>
     <div class="composer hidden" id="composer">
-      <div class="win-warn" id="winWarn">⚠️ Pasaron más de 24 h desde el último mensaje del contacto. WhatsApp solo permite responder con una plantilla aprobada.</div>
+      <div class="win-warn" id="winWarn">🔒 Pasaron más de 24 h desde el último mensaje. Para responder toca 📋 y envía una plantilla aprobada.</div>
       <div class="row">
         <button class="tpl" title="Plantillas" onclick="openTemplates()">📋</button>
         <textarea id="reply" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
@@ -255,13 +259,28 @@ function renderThread(num){
       return `<div class="bub ${cls}">${esc(m.body)||'<i>(sin texto)</i>'}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
   }
   th.scrollTop=th.scrollHeight;
-  const hrs=(Date.now()-lastInbound(c))/36e5;
-  document.getElementById('winWarn').style.display=(c.msgs.length&&(hrs>24||lastInbound(c)===0))?'block':'none';
+  const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
+  const comp=document.getElementById('composer');
+  const ta2=document.getElementById('reply');
+  const sb=comp.querySelector('.send');
+  if(inside){
+    comp.classList.remove('locked');
+    ta2.disabled=false; if(sb)sb.disabled=false;
+    ta2.placeholder='Escribe una respuesta…';
+    document.getElementById('winWarn').style.display='none';
+  }else{
+    comp.classList.add('locked');
+    ta2.value=''; ta2.disabled=true; if(sb)sb.disabled=true;
+    ta2.placeholder='🔒 Fuera de la ventana de 24 h — usa 📋 plantillas';
+    document.getElementById('winWarn').style.display='block';
+  }
 }
 
 async function send(){
   if(!current)return;
-  const ta=document.getElementById('reply');const text=ta.value.trim();if(!text)return;
+  const ta=document.getElementById('reply');
+  if(ta.disabled)return;
+  const text=ta.value.trim();if(!text)return;
   document.getElementById('sendErr').textContent='';ta.value='';
   const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,body:text})});
   const d=await r.json();
