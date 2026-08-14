@@ -60,6 +60,16 @@ module.exports = async (req, res) => {
   try {
     if (!from.startsWith('whatsapp:')) return done();
 
+    // Interruptor de pausa (Redis/Upstash): si esta pausado, el bot no responde.
+    try {
+      const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
+      if (KU && KT) {
+        const pr = await fetch(`${KU}/get/klivox_bot_paused`, { headers: { Authorization: `Bearer ${KT}` } });
+        const pd = await pr.json();
+        if (pd && pd.result === '1') return done();
+      }
+    } catch (_) {}
+
     const SID = process.env.TWILIO_ACCOUNT_SID;
     const TOKEN = process.env.TWILIO_AUTH_TOKEN;
     const FROM = process.env.TWILIO_WHATSAPP_FROM;
