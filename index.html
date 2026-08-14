@@ -30,6 +30,8 @@
   .side-h b{font-size:15px}.side-h small{display:block;color:var(--cyan);font-size:11px}
   .ico{background:none;border:1px solid var(--brd);color:var(--txt);border-radius:9px;width:38px;height:38px;font-size:17px;cursor:pointer;display:grid;place-items:center;flex:0 0 auto}
   .ico:hover{background:rgba(255,255,255,.05)}
+  .botbtn.active{border-color:rgba(37,211,102,.5);color:#4ade80}
+  .botbtn.paused{border-color:rgba(252,165,165,.6);color:#fca5a5;background:rgba(252,165,165,.10)}
   .searchwrap{padding:10px 14px;border-bottom:1px solid var(--brd)}
   .searchwrap input{width:100%;padding:10px 14px;font-size:15px}
   .convs{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
@@ -128,7 +130,8 @@
   <div class="side" id="side">
     <div class="side-h">
       <div class="logo">K</div>
-      <div style="flex:1"><b>Klivox</b><small>● WhatsApp</small></div>
+      <div style="flex:1"><b>Klivox</b><small id="botStatus">● Bot activo</small></div>
+      <button class="ico botbtn active" id="botBtn" title="Bot activo — toca para pausar" onclick="toggleBot()">🤖</button>
       <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
       <button class="ico" title="Actualizar" onclick="load()">↻</button>
     </div>
@@ -185,7 +188,39 @@ async function login(){
   localStorage.setItem('kv_pass',PASS);
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  await load();loadMetaTemplates();setInterval(load,8000);setInterval(loadMetaTemplates,60000);
+  await load();loadMetaTemplates();loadBotState();setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadBotState,15000);
+}
+
+let botPaused=false;
+async function loadBotState(){
+  try{
+    const r=await fetch('/api/bot-state',{headers:hdr()});
+    if(!r.ok)return;
+    const d=await r.json();
+    botPaused=!!d.paused;
+    renderBotBtn();
+  }catch(e){}
+}
+function renderBotBtn(){
+  const b=document.getElementById('botBtn');
+  const s=document.getElementById('botStatus');
+  if(b){
+    b.classList.toggle('paused',botPaused);
+    b.classList.toggle('active',!botPaused);
+    b.title=botPaused?'Bot en pausa — toca para activar':'Bot activo — toca para pausar';
+  }
+  if(s){s.textContent=botPaused?'⏸ Bot en pausa':'● Bot activo';s.style.color=botPaused?'#fca5a5':'#25d366';}
+}
+async function toggleBot(){
+  const next=!botPaused;
+  if(next && !confirm('¿Pausar el bot? Dejará de responder automáticamente hasta que lo actives.')) return;
+  const b=document.getElementById('botBtn');if(b)b.disabled=true;
+  try{
+    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({paused:next})});
+    const d=await r.json();
+    if(d&&typeof d.paused==='boolean'){botPaused=d.paused;renderBotBtn();}
+  }catch(e){}
+  if(b)b.disabled=false;
 }
 
 async function loadMetaTemplates(){
