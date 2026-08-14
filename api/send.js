@@ -14,9 +14,10 @@ module.exports = async (req, res) => {
   let to = (body.to || '').trim();
   const text = (body.body || '').trim();
   const contentSid = (body.contentSid || '').trim();
+  const mediaUrl = (body.mediaUrl || '').trim();
   const variables = body.variables || null; // { "1": "Laura" }
 
-  if (!to || (!text && !contentSid)) { res.status(400).json({ ok: false, error: 'Faltan datos' }); return; }
+  if (!to || (!text && !contentSid && !mediaUrl)) { res.status(400).json({ ok: false, error: 'Faltan datos' }); return; }
   if (!to.startsWith('whatsapp:')) to = 'whatsapp:' + to;
 
   const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
@@ -29,7 +30,8 @@ module.exports = async (req, res) => {
       params.set('ContentVariables', JSON.stringify(variables));
     }
   } else {
-    params.set('Body', text);
+    if (text) params.set('Body', text);
+    if (mediaUrl) params.set('MediaUrl', mediaUrl);
   }
 
   try {
