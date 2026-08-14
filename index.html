@@ -146,6 +146,8 @@
       <div class="win-warn" id="winWarn">🔒 Pasaron más de 24 h desde el último mensaje. Para responder toca 📋 y envía una plantilla aprobada.</div>
       <div class="row">
         <button class="tpl" title="Plantillas" onclick="openTemplates()">📋</button>
+        <button class="tpl att" id="attBtn" title="Adjuntar archivo (PDF, imagen)" onclick="attachFile()">📎</button>
+        <input type="file" id="fileInput" style="display:none" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" onchange="onFilePicked(this)"/>
         <textarea id="reply" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
         <button class="send" onclick="send()">➤</button>
       </div>
@@ -331,6 +333,7 @@ function renderThread(num){
   const comp=document.getElementById('composer');
   const ta2=document.getElementById('reply');
   const sb=comp.querySelector('.send');
+  const ab=document.getElementById('attBtn'); if(ab)ab.disabled=!inside;
   if(inside){
     comp.classList.remove('locked');
     ta2.disabled=false; if(sb)sb.disabled=false;
@@ -342,6 +345,37 @@ function renderThread(num){
     ta2.placeholder='🔒 Fuera de la ventana de 24 h — usa 📋 plantillas';
     document.getElementById('winWarn').style.display='block';
   }
+}
+
+function attachFile(){
+  const inp=document.getElementById('fileInput');
+  const ab=document.getElementById('attBtn');
+  if(!inp || (ab && ab.disabled)) return;
+  inp.value=''; inp.click();
+}
+async function onFilePicked(inp){
+  const f=inp.files && inp.files[0];
+  if(!f || !current) return;
+  const errEl=document.getElementById('sendErr');
+  if(f.size > 4*1024*1024){ errEl.textContent='El archivo supera 4 MB. Usa uno más liviano.'; return; }
+  errEl.textContent='Subiendo '+f.name+'…';
+  const ab=document.getElementById('attBtn'); if(ab)ab.disabled=true;
+  try{
+    const dataBase64=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(String(r.result).split(',')[1]);
+      r.onerror=rej; r.readAsDataURL(f);
+    });
+    const up=await fetch('/api/upload',{method:'POST',headers:hdr(),body:JSON.stringify({filename:f.name,contentType:f.type||'application/octet-stream',dataBase64})}).then(r=>r.json());
+    if(!up.ok || !up.url){ errEl.textContent='No se pudo subir: '+(up.error||'error'); if(ab)ab.disabled=false; return; }
+    const reply=document.getElementById('reply');
+    const caption=(reply.value||'').trim() || ('📎 '+f.name);
+    const sd=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,mediaUrl:up.url,body:caption})}).then(r=>r.json());
+    if(!sd.ok){ errEl.textContent=sd.code===63016?'Fuera de la ventana de 24 h: no se pueden enviar archivos.':('No se pudo enviar: '+(sd.error||'error')); }
+    else { errEl.textContent=''; reply.value=''; }
+  }catch(e){ errEl.textContent='Error al adjuntar: '+e; }
+  if(ab)ab.disabled=false;
+  await load();
 }
 
 async function send(){
