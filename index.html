@@ -192,6 +192,37 @@ async function login(){
 }
 
 let botPaused=false;
+let chatPaused={};
+async function loadChatBotState(num){
+  try{
+    const r=await fetch('/api/bot-state?number='+encodeURIComponent(num),{headers:hdr()});
+    if(!r.ok)return;
+    const d=await r.json();
+    chatPaused[num]=!!d.paused;
+    if(current===num)paintChatBotBtn(num);
+  }catch(e){}
+}
+function paintChatBotBtn(num){
+  const b=document.getElementById('chatBotBtn');
+  if(!b)return;
+  const p=!!chatPaused[num];
+  b.classList.toggle('paused',p);
+  b.classList.toggle('active',!p);
+  b.title=p?'Bot pausado en este chat — toca para activar':'Bot activo en este chat — toca para pausar';
+}
+async function toggleChatBot(){
+  if(!current)return;
+  const num=current, next=!chatPaused[num];
+  if(next && !confirm('¿Pausar el bot solo en este chat? Tú lo atenderás manualmente.')) return;
+  const b=document.getElementById('chatBotBtn');if(b)b.disabled=true;
+  try{
+    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,paused:next})});
+    const d=await r.json();
+    if(d&&typeof d.paused==='boolean'){chatPaused[num]=d.paused;paintChatBotBtn(num);}
+  }catch(e){}
+  if(b)b.disabled=false;
+}
+
 async function loadBotState(){
   try{
     const r=await fetch('/api/bot-state',{headers:hdr()});
@@ -273,7 +304,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-function open_(num){current=num;renderConvs();renderThread(num);document.getElementById('app').classList.add('show-thread');}
+function open_(num){current=num;renderConvs();renderThread(num);loadChatBotState(num);document.getElementById('app').classList.add('show-thread');}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){
@@ -285,7 +316,9 @@ function renderThread(num){
     `<button class="back" onclick="backToList()" aria-label="Volver">←</button>
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
+     <button class="ico botbtn" id="chatBotBtn" title="Bot en este chat" onclick="toggleChatBot()">🤖</button>
      <button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
+  paintChatBotBtn(num);
   const th=document.getElementById('thread');
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
