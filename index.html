@@ -14,7 +14,6 @@
   input:focus,textarea:focus{border-color:var(--cyan)}
   .btn{background:var(--grad);border:none;color:#04121f;font-weight:700;font-family:inherit;font-size:15px;padding:13px 18px;border-radius:11px;cursor:pointer;width:100%}
   .logo{width:52px;height:52px;border-radius:14px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:24px;color:#04121f}
-  /* login */
   #login{height:100dvh;display:grid;place-items:center;padding:20px}
   .card{background:var(--panel);border:1px solid var(--brd);border-radius:18px;padding:34px;width:340px;max-width:100%;text-align:center}
   .card .logo{margin:0 auto 16px}
@@ -22,7 +21,6 @@
   .card p{color:var(--muted);font-size:13px;margin-bottom:20px}
   #login input{width:100%;padding:13px 14px;margin-bottom:12px}
   .err{color:#fca5a5;font-size:12.5px;margin-top:8px;min-height:16px}
-  /* app */
   #app{display:grid;grid-template-columns:340px 1fr;height:100dvh}
   .side{border-right:1px solid var(--brd);background:var(--panel2);display:flex;flex-direction:column;min-height:0}
   .side-h{padding:14px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px}
@@ -34,7 +32,6 @@
   .botbtn.paused{border-color:rgba(252,165,165,.6);color:#fca5a5;background:rgba(252,165,165,.10)}
   .searchwrap{padding:10px 14px;border-bottom:1px solid var(--brd)}
   .searchwrap input{width:100%;padding:10px 14px;font-size:15px}
-  /* usage / metricas */
   .usage{padding:11px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
   .usage-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
   .usage-row .u-count{font-size:13px;font-weight:700}
@@ -46,7 +43,6 @@
   .usage-row2{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:11.5px;color:var(--muted)}
   .usage-row2 b{color:var(--txt);font-weight:600}
   .usage.loading{opacity:.55}
-  /* convs */
   .convs{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
   .conv{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;display:flex;gap:11px;align-items:center}
   .conv:hover{background:rgba(255,255,255,.03)}
@@ -59,7 +55,6 @@
   .conv .last{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
   .conv .dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:0 0 auto}
   .side-empty{padding:24px;color:var(--muted);font-size:13px;text-align:center}
-  /* thread */
   .main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
   .main-h{padding:12px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:11px;background:var(--panel2)}
   .main-h .who{flex:1;min-width:0}
@@ -85,7 +80,6 @@
   .composer.locked .send{opacity:.35;cursor:not-allowed;filter:grayscale(1)}
   .composer.locked .tpl{background:var(--grad);color:#04121f;border:none;animation:tplpulse 1.8s infinite}
   @keyframes tplpulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.55)}70%{box-shadow:0 0 0 8px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
-  /* modal / sheet */
   .overlay{position:fixed;inset:0;background:rgba(3,7,18,.72);z-index:40;display:flex;align-items:center;justify-content:center;padding:18px}
   .modal{background:var(--panel);border:1px solid var(--brd);border-radius:16px;padding:22px;width:400px;max-width:100%;max-height:88dvh;overflow-y:auto}
   .modal h2{font-size:17px;margin-bottom:14px}
@@ -116,7 +110,6 @@
   .tpl-item.meta.locked{opacity:.6;cursor:not-allowed}
   .tpl-item .btns{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
   .tpl-item .btns span{font-size:11px;color:var(--muted);border:1px solid var(--brd);border-radius:7px;padding:2px 8px}
-  /* ---- MOBILE ---- */
   @media(max-width:760px){
     #app{grid-template-columns:1fr;position:relative}
     .side{position:absolute;inset:0;width:100%;z-index:5}
@@ -149,6 +142,7 @@
       <div style="flex:1"><b>Klivox</b><small id="botStatus">● Bot activo</small></div>
       <button class="ico botbtn active" id="botBtn" title="Bot activo — toca para pausar" onclick="toggleBot()">🤖</button>
       <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
+      <button class="ico" title="Iniciar conversación con plantilla" onclick="openStartConv()">🚀</button>
       <button class="ico" title="Actualizar" onclick="load();loadUsage()">↻</button>
     </div>
     <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div>
@@ -221,7 +215,6 @@ async function login(){
   setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadBotState,15000);setInterval(loadUsage,60000);
 }
 
-/* ---- Métricas de uso (contador de mensajes + gasto Meta) ---- */
 function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
 async function loadUsage(){
   try{
@@ -443,7 +436,6 @@ async function send(){
   await load();loadUsage();
 }
 
-/* ---- Nuevo chat / contactos ---- */
 function normNum(n){n=(n||'').replace(/[^\d+]/g,'');if(n&&!n.startsWith('+'))n='+'+n;return n;}
 function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 function openNewChat(){
@@ -455,7 +447,7 @@ function openNewChat(){
     <label>Nombre del contacto (opcional)</label>
     <input id="ncName" placeholder="Ej: Dra. Laura Pérez"/>
     <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="createChat()">Abrir chat</button></div>
-    <div class="muted-note">Podrás escribir de una vez si el contacto te escribió en las últimas 24 h. Si no, WhatsApp exige una plantilla aprobada por Meta.</div>
+    <div class="muted-note">Podrás escribir de una vez si el contacto te escribió en las últimas 24 h. Si no, usa 🚀 para iniciar con una plantilla aprobada.</div>
    </div></div>`;
   setTimeout(()=>document.getElementById('ncNum').focus(),50);
 }
@@ -468,6 +460,66 @@ function createChat(){
   if(!convs[num])convs[num]={num,msgs:[]};
   closeModal();open_(num);
 }
+/* ---- Iniciar conversación con plantilla (fuera de 24 h) ---- */
+let scVars={};
+function openStartConv(){
+  scVars={};
+  const approved=metaTemplates.filter(t=>t.status==='approved');
+  const opts=approved.map(t=>`<option value="${metaTemplates.indexOf(t)}">${esc(t.name)}</option>`).join('');
+  document.getElementById('modalRoot').innerHTML=`
+   <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
+    <h2>Iniciar conversación</h2>
+    <div class="muted-note" style="margin:0 0 8px">Para escribirle a alguien que NO te ha escrito en 24 h, WhatsApp exige una plantilla aprobada por Meta.</div>
+    <label>Número de WhatsApp (con código de país)</label>
+    <input id="scNum" placeholder="+57 300 123 4567" inputmode="tel"/>
+    <label>Nombre del contacto (opcional)</label>
+    <input id="scName" placeholder="Ej: Dra. Laura Pérez"/>
+    <label>Plantilla aprobada *</label>
+    ${approved.length?`<select id="scTpl" class="mt-sel" onchange="scRenderVars()"><option value="">Selecciona una plantilla…</option>${opts}</select>`:'<div class="muted-note" style="color:#fca5a5">No hay plantillas aprobadas todavía. Crea una en 📋 y espera la aprobación de Meta.</div>'}
+    <div id="scVarsBox"></div>
+    <div id="scPrevBox"></div>
+    <div id="scErr" class="send-err"></div>
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="scSend" onclick="startConv()" ${approved.length?'':'disabled'}>Enviar e iniciar chat</button></div>
+   </div></div>`;
+  setTimeout(()=>{const e=document.getElementById('scNum');if(e)e.focus();},50);
+}
+function scCurrentTpl(){
+  const sel=document.getElementById('scTpl'); if(!sel||!sel.value)return null;
+  return metaTemplates[parseInt(sel.value,10)]||null;
+}
+function scRenderVars(){
+  const t=scCurrentTpl(); const box=document.getElementById('scVarsBox'); scVars={};
+  if(!t||!t.varCount){if(box)box.innerHTML='';scPrev();return;}
+  let html='<label>Variables de la plantilla</label>';
+  for(let i=1;i<=t.varCount;i++){html+=`<input placeholder="Valor para {{${i}}}" oninput="scVars['${i}']=this.value;scPrev()" style="margin-bottom:6px"/>`;}
+  box.innerHTML=html; scPrev();
+}
+function scPrev(){
+  const t=scCurrentTpl(); const box=document.getElementById('scPrevBox'); if(!box)return;
+  if(!t){box.innerHTML='';return;}
+  let b=(t.body||''); b=b.replace(/\{\{\s*(\d+)\s*\}\}/g,(m,n)=>scVars[n]||('{{'+n+'}}'));
+  box.innerHTML='<div class="sec-title">Vista previa</div><div class="tpl-item meta ok" style="cursor:default"><div class="tm">'+esc(b)+'</div></div>';
+}
+async function startConv(){
+  const num=normNum(document.getElementById('scNum').value);
+  const nm=document.getElementById('scName').value.trim();
+  const t=scCurrentTpl();
+  const err=document.getElementById('scErr');
+  if(num.replace('+','').length<8){err.textContent='Número inválido. Incluye el código de país.';return;}
+  if(!t){err.textContent='Selecciona una plantilla aprobada.';return;}
+  const variables={}; for(let i=1;i<=(t.varCount||0);i++){variables[i]=scVars[i]||'';}
+  const btn=document.getElementById('scSend');btn.disabled=true;btn.textContent='Enviando…';
+  try{
+    const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:num,contentSid:t.sid,variables:t.varCount?variables:null})});
+    const d=await r.json();
+    if(!d.ok){err.textContent='No se pudo enviar: '+(d.error||'error');btn.disabled=false;btn.textContent='Enviar e iniciar chat';return;}
+    if(!contacts.includes(num)){contacts.push(num);saveContacts();}
+    if(nm){names[num]=nm;saveNames();}
+    closeModal();
+    await load();loadUsage();
+    open_(num);
+  }catch(e){err.textContent='Error: '+e;btn.disabled=false;btn.textContent='Enviar e iniciar chat';}
+}
 function renameContact(num){
   const cur=names[num]||'';
   const nm=prompt('Nombre para '+num+':',cur);
@@ -476,7 +528,6 @@ function renameContact(num){
   saveNames();renderConvs();renderThread(num);
 }
 
-/* ---- Plantillas ---- */
 const badgeInfo={approved:['ok','● Aprobada'],pending:['wait','● En revisión'],rejected:['no','● Rechazada']};
 function metaPreview(t){
   const nm=current?nameOf(current).split(' ')[0]:'';
