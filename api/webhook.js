@@ -73,8 +73,8 @@ module.exports = async (req, res) => {
     if (!from || !body) return done(); // por ahora solo texto
 
     // Interruptor de pausa: global o por conversación (Redis)
-    if ((await kvGet('klivox_bot_paused')) === '1') return done();
-    if ((await kvGet('klivox_paused:' + from)) === '1') return done();
+    if ((await kvGet('tania_bot_paused')) === '1') return done();
+    if ((await kvGet('tania_paused:' + from)) === '1') return done();
 
     const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER, AKEY = process.env.ANTHROPIC_API_KEY;
     if (!KEY) return done();
