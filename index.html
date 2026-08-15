@@ -203,6 +203,12 @@ function fmtTime(d){const t=new Date(d);const now=new Date();const sameDay=t.toD
   return sameDay? t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : t.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit'})+' '+t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
 function esc(s){return (s||'').replace(/</g,'&lt;')}
 
+/* ---- Costo estimado por plantilla (precio Meta Colombia + 20% de margen) ---- */
+const META_PRICE={MARKETING:0.0125,UTILITY:0.0008,AUTHENTICATION:0.0008};
+const PRICE_MARGIN=1.20;
+function tplCost(t){const c=((t&&t.category)||'').toUpperCase();const b=META_PRICE[c];return (b==null)?null:b*PRICE_MARGIN;}
+function fmtCost(v){return v==null?'—':('$'+Number(v).toFixed(4)+' USD');}
+
 async function login(){
   PASS=document.getElementById('pass').value.trim();
   document.getElementById('loginErr').textContent='';
@@ -506,7 +512,9 @@ function scPrev(){
   const t=scCurrentTpl(); const box=document.getElementById('scPrevBox'); if(!box)return;
   if(!t){box.innerHTML='';return;}
   let b=(t.body||''); b=b.replace(/\{\{\s*(\d+)\s*\}\}/g,(m,n)=>scVars[n]||('{{'+n+'}}'));
-  box.innerHTML='<div class="sec-title">Vista previa</div><div class="tpl-item meta ok" style="cursor:default"><div class="tm">'+esc(b)+'</div></div>';
+  const cst=tplCost(t);
+  const cstLine=cst!=null?'<div style="font-size:12.5px;color:#4ade80;margin-top:8px">💵 Costo estimado de este envío: <b>'+fmtCost(cst)+'</b></div>':'';
+  box.innerHTML='<div class="sec-title">Vista previa</div><div class="tpl-item meta ok" style="cursor:default"><div class="tm">'+esc(b)+'</div></div>'+cstLine;
 }
 async function startConv(){
   const num=normNum(document.getElementById('scNum').value);
@@ -549,9 +557,11 @@ function renderMetaTemplates(){
     const locked=t.status!=='approved';
     const btns=(t.buttons&&t.buttons.length)?`<div class="btns">${t.buttons.map(b=>'<span>'+esc(b)+'</span>').join('')}</div>`:'';
     const onclick=locked?'':`onclick="sendMetaTemplate(${i})"`;
+    const cst=tplCost(t);
+    const cstH=cst!=null?`<div style="font-size:11px;color:#4ade80;margin-top:5px">💵 ${fmtCost(cst)} por envío${(t.category||'').toUpperCase()==='UTILITY'?' · gratis dentro de 24 h':''}</div>`:'';
     return `<div class="tpl-item meta ${bi[0]} ${locked?'locked':''}" ${onclick}>
       <div class="tt">${esc(t.name)}<span class="badge ${bi[0]}">${bi[1]}</span></div>
-      <div class="tm">${esc(metaPreview(t))}</div>${btns}
+      <div class="tm">${esc(metaPreview(t))}</div>${btns}${cstH}
     </div>`;
   }).join('');
 }
@@ -570,7 +580,7 @@ function openTemplates(){
     <div class="sec-title">Respuestas rápidas (dentro de 24 h)</div>
     ${items}
     <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">＋ Nueva respuesta rápida</button>
-    <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
+    <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). El costo mostrado ya incluye el margen. Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
    </div></div>`;
 }
 async function sendMetaTemplate(i){
@@ -578,6 +588,8 @@ async function sendMetaTemplate(i){
   if(!current){alert('Abre o crea un chat primero.');return;}
   const nm=nameOf(current).split(' ')[0]||'Hola';
   const variables=t.varCount>0?{"1":nm}:null;
+  const cst=tplCost(t);
+  if(cst!=null && !confirm('Enviar la plantilla "'+t.name+'".\nCosto estimado: '+fmtCost(cst)+'\n\n¿Continuar?')) return;
   closeModal();
   const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,contentSid:t.sid,variables})});
   const d=await r.json();
