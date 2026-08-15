@@ -91,6 +91,9 @@
   .modal h2{font-size:17px;margin-bottom:14px}
   .modal label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
   .modal input{width:100%;padding:11px 13px}
+  .mt-sel{width:100%;padding:11px 13px;background:var(--panel2);border:1px solid var(--brd);border-radius:11px;color:var(--txt);font-size:15px;font-family:inherit}
+  .mt-row{display:flex;gap:10px}.mt-row>div{flex:1}
+  .mt-btnbox{border:1px solid var(--brd);border-radius:9px;padding:8px;margin-bottom:6px;position:relative}
   .modal .actions{display:flex;gap:10px;margin-top:18px}
   .modal .actions .btn{flex:1}
   .btn.ghost{background:none;border:1px solid var(--brd);color:var(--txt)}
@@ -481,7 +484,7 @@ function metaPreview(t){
   return b;
 }
 function renderMetaTemplates(){
-  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Se crean en Zavu y aparecen aquí con su estado.</div>';
+  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Créalas abajo; se envían a revisión de Meta.</div>';
   return metaTemplates.map((t,i)=>{
     const bi=badgeInfo[t.status]||badgeInfo.pending;
     const locked=t.status!=='approved';
@@ -504,6 +507,7 @@ function openTemplates(){
     <h2>Plantillas</h2>
     <div class="sec-title">Plantillas de Meta (fuera de 24 h)</div>
     ${renderMetaTemplates()}
+    <button class="btn ghost" style="margin-top:6px" onclick="openNewMetaTemplate()">＋ Nueva plantilla de Meta</button>
     <div class="sec-title">Respuestas rápidas (dentro de 24 h)</div>
     ${items}
     <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">＋ Nueva respuesta rápida</button>
@@ -520,6 +524,85 @@ async function sendMetaTemplate(i){
   const d=await r.json();
   if(!d.ok){document.getElementById('sendErr').textContent='No se pudo enviar la plantilla: '+(d.error||'error');}
   await load();loadUsage();
+}
+/* ---- Crear plantilla de Meta (estilo Zavu) ---- */
+let mtBtns=[];
+function openNewMetaTemplate(){
+  mtBtns=[];
+  document.getElementById('modalRoot').innerHTML=`
+   <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
+    <h2>Nueva plantilla de Meta</h2>
+    <div class="muted-note" style="margin:0 0 8px">Se envía a revisión de Meta al crearla. La aprobación suele tardar de minutos a 24 h.</div>
+    <label>Nombre *</label>
+    <input id="tName" placeholder="ej: recordatorio_cita" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'_')"/>
+    <div class="muted-note" style="margin-top:4px">Solo minúsculas, números y guiones bajos.</div>
+    <div class="mt-row" style="margin-top:6px">
+      <div><label>Idioma</label>
+        <select id="tLang" class="mt-sel"><option value="es">Español</option><option value="es_CO">Español (Colombia)</option><option value="en">Inglés</option></select></div>
+      <div><label>Categoría *</label>
+        <select id="tCat" class="mt-sel"><option value="UTILITY">Utilidad</option><option value="MARKETING">Marketing</option><option value="AUTHENTICATION">Autenticación</option></select></div>
+    </div>
+    <label>Cuerpo del mensaje * <span id="tBodyCount" style="float:right;color:var(--muted);font-weight:400">0/1024</span></label>
+    <textarea id="tBody" maxlength="1024" style="width:100%;min-height:92px;padding:11px 13px" placeholder="Hola {{1}}, te recordamos tu cita el {{2}}. ¡Te esperamos!" oninput="document.getElementById('tBodyCount').textContent=this.value.length+'/1024';mtPrev()"></textarea>
+    <div class="muted-note" style="margin-top:4px">Usa variables como {{1}}, {{2}}… que se rellenan al enviar.</div>
+    <label>Encabezado (opcional)</label>
+    <input id="tHeader" placeholder="Texto del encabezado" oninput="mtPrev()"/>
+    <label>Pie de página (opcional)</label>
+    <input id="tFooter" maxlength="60" placeholder="Ej: Consultorio Dra. Tania" oninput="mtPrev()"/>
+    <label>Botones (opcional, máx 3)</label>
+    <div id="tBtns"></div>
+    <button class="btn ghost" style="margin-top:6px" onclick="mtAddBtn()">＋ Agregar botón</button>
+    <div class="sec-title">Vista previa</div>
+    <div class="tpl-item meta ok" style="cursor:default"><div class="tm" id="tPrev">—</div></div>
+    <div id="tErr" class="send-err"></div>
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="tCreate" onclick="createMetaTemplate()">Crear y enviar a Meta</button></div>
+   </div></div>`;
+  mtPrev();
+}
+function mtPrev(){
+  const p=document.getElementById('tPrev'); if(!p)return;
+  const h=(document.getElementById('tHeader').value||'').trim();
+  const b=(document.getElementById('tBody').value||'').trim();
+  const f=(document.getElementById('tFooter').value||'').trim();
+  let html=''; if(h)html+='<b>'+esc(h)+'</b>\n'; html+=(esc(b)||'<i>(escribe el cuerpo…)</i>'); if(f)html+='\n<span style="color:#8a98b8;font-size:11px">'+esc(f)+'</span>';
+  p.innerHTML=html;
+}
+function mtAddBtn(){ if(mtBtns.length>=3)return; mtBtns.push({type:'quick_reply',text:'',url:'',phoneNumber:''}); mtRenderBtns(); }
+function mtRenderBtns(){
+  const c=document.getElementById('tBtns'); if(!c)return;
+  c.innerHTML=mtBtns.map((x,i)=>`
+   <div class="mt-btnbox">
+     <select class="mt-sel" onchange="mtBtns[${i}].type=this.value;mtRenderBtns()">
+       <option value="quick_reply" ${x.type==='quick_reply'?'selected':''}>Respuesta rápida</option>
+       <option value="url" ${x.type==='url'?'selected':''}>Abrir enlace (URL)</option>
+       <option value="phone" ${x.type==='phone'?'selected':''}>Llamar (teléfono)</option>
+     </select>
+     <input placeholder="Texto del botón (máx 25)" maxlength="25" value="${esc(x.text)}" oninput="mtBtns[${i}].text=this.value" style="margin-top:6px"/>
+     ${x.type==='url'?`<input placeholder="https://..." value="${esc(x.url)}" oninput="mtBtns[${i}].url=this.value" style="margin-top:6px"/>`:''}
+     ${x.type==='phone'?`<input placeholder="+57 300 000 0000" value="${esc(x.phoneNumber)}" oninput="mtBtns[${i}].phoneNumber=this.value" style="margin-top:6px"/>`:''}
+     <button class="del" onclick="mtBtns.splice(${i},1);mtRenderBtns()">Quitar</button>
+   </div>`).join('');
+}
+async function createMetaTemplate(){
+  const name=(document.getElementById('tName').value||'').trim();
+  const language=document.getElementById('tLang').value;
+  const category=document.getElementById('tCat').value;
+  const body=(document.getElementById('tBody').value||'').trim();
+  const headerText=(document.getElementById('tHeader').value||'').trim();
+  const footer=(document.getElementById('tFooter').value||'').trim();
+  const buttons=mtBtns.filter(x=>(x.text||'').trim());
+  const err=document.getElementById('tErr');
+  if(!name||!body){err.textContent='Completa al menos el nombre y el cuerpo del mensaje.';return;}
+  const btn=document.getElementById('tCreate');btn.disabled=true;btn.textContent='Creando…';
+  try{
+    const r=await fetch('/api/create-template',{method:'POST',headers:hdr(),body:JSON.stringify({name,language,category,body,headerText,footer,buttons})});
+    const d=await r.json();
+    if(!d.ok){err.textContent='No se pudo crear: '+(d.error||'error');btn.disabled=false;btn.textContent='Crear y enviar a Meta';return;}
+    closeModal();
+    await loadMetaTemplates();
+    alert(d.submitted?('✅ Plantilla "'+d.name+'" creada y enviada a revisión de Meta.'):('✅ Plantilla "'+d.name+'" creada como borrador.'+(d.submitError?('\n\nNota: '+d.submitError):'')));
+    openTemplates();
+  }catch(e){err.textContent='Error: '+e;btn.disabled=false;btn.textContent='Crear y enviar a Meta';}
 }
 function useTemplate(i){
   const t=templates[i];if(!t)return;
