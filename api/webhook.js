@@ -49,6 +49,23 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia una conversacion con el equipo.`;
 // ============================================================================
 
+// Aviso por Telegram: te llega a tu Telegram personal cada vez que entra un mensaje.
+// Requiere env TELEGRAM_TOKEN y TELEGRAM_CHAT_ID (opcionales; si faltan, no hace nada).
+async function notifyTelegram(fromNum, text) {
+  const TG = process.env.TELEGRAM_TOKEN;
+  const CHAT = process.env.TELEGRAM_CHAT_ID;
+  if (!TG || !CHAT) return;
+  const preview = (text || '').slice(0, 300) || '(sin texto / adjunto)';
+  const msg = '🔔 Nuevo mensaje en tu bandeja Klivox\n\n👤 ' + fromNum + '\n💬 ' + preview + '\n\nAbrir: https://klivox-inbox.vercel.app';
+  try {
+    await fetch('https://api.telegram.org/bot' + TG + '/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT, text: msg, disable_web_page_preview: true })
+    });
+  } catch (_) {}
+}
+
 module.exports = async (req, res) => {
   const p = req.body || {};
   const from = p.From || '';
@@ -59,6 +76,9 @@ module.exports = async (req, res) => {
 
   try {
     if (!from.startsWith('whatsapp:')) return done();
+
+    // Aviso a Telegram (si esta configurado)
+    await notifyTelegram(from.replace('whatsapp:', ''), body);
 
     // Interruptor de pausa (Redis/Upstash): si esta pausado, el bot no responde.
     try {
