@@ -1,4 +1,4 @@
-// Bandeja Klivox — lista los mensajes de WhatsApp desde Twilio
+// Bandeja Klivox — lista los mensajes de WhatsApp desde Twilio (con soporte de imágenes/archivos)
 // Requiere env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, INBOX_PASSWORD
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
@@ -14,7 +14,16 @@ module.exports = async (req, res) => {
     const d = await r.json();
     const messages = (d.messages || [])
       .filter(m => (m.from && m.from.startsWith('whatsapp:')) || (m.to && m.to.startsWith('whatsapp:')))
-      .map(m => ({ sid: m.sid, from: m.from, to: m.to, body: m.body, direction: m.direction, status: m.status, date: m.date_created }));
+      .map(m => {
+        const numMedia = parseInt(m.num_media || '0', 10) || 0;
+        const out = { sid: m.sid, from: m.from, to: m.to, body: m.body, direction: m.direction, status: m.status, date: m.date_created };
+        if (numMedia > 0) {
+          out.numMedia = numMedia;
+          out.type = 'media';
+          out.mediaUrl = '/api/media?sid=' + encodeURIComponent(m.sid);
+        }
+        return out;
+      });
     res.status(200).json({ messages });
   } catch (e) {
     res.status(200).json({ messages: [], error: String(e) });
