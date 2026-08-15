@@ -1,6 +1,6 @@
 // api/bot-state.js — interruptor de pausa del bot en Redis (Upstash)
-// Sin 'number' => interruptor GLOBAL (klivox_bot_paused).
-// Con 'number' => interruptor por conversacion (klivox_paused:<number>).
+// Sin 'number' => interruptor GLOBAL (tania_bot_paused).
+// Con 'number' => interruptor por conversacion (tania_paused:<number>).
 module.exports = async (req, res) => {
   const pass = req.headers['x-inbox-pass'] || '';
   if (!process.env.INBOX_PASSWORD || pass !== process.env.INBOX_PASSWORD) {
@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
   const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
   if (!KU || !KT) return res.status(500).json({ error: 'kv_no_config' });
   const H = { Authorization: `Bearer ${KT}` };
-  const keyFor = (num) => num ? ('klivox_paused:' + String(num)) : 'klivox_bot_paused';
+  const keyFor = (num) => num ? ('tania_paused:' + String(num)) : 'tania_bot_paused';
   try {
     if (req.method === 'POST') {
       const b = req.body || {};
