@@ -1,20 +1,27 @@
-// Bandeja Klivox — lista los mensajes de WhatsApp desde Twilio
-// Requiere env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, INBOX_PASSWORD
+// api/messages.js — historial de mensajes para la bandeja (desde Zavu).
+// Devuelve el mismo formato que espera index.html: { messages: [{direction, from, to, body, date}] }
+// Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), INBOX_PASSWORD
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
     res.status(401).json({ error: 'unauthorized' }); return;
   }
-  const SID = process.env.TWILIO_ACCOUNT_SID;
-  const TOKEN = process.env.TWILIO_AUTH_TOKEN;
-  if (!SID || !TOKEN) { res.status(200).json({ messages: [], error: 'Faltan credenciales de Twilio' }); return; }
-  const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
+  const KEY = process.env.ZAVU_API_KEY;
+  const SENDER = process.env.ZAVU_SENDER;
+  const headers = { Authorization: 'Bearer ' + KEY };
+  if (SENDER) headers['Zavu-Sender'] = SENDER;
   try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json?PageSize=200`;
-    const r = await fetch(url, { headers: { Authorization: auth } });
-    const d = await r.json();
-    const messages = (d.messages || [])
-      .filter(m => (m.from && m.from.startsWith('whatsapp:')) || (m.to && m.to.startsWith('whatsapp:')))
-      .map(m => ({ sid: m.sid, from: m.from, to: m.to, body: m.body, direction: m.direction, status: m.status, date: m.date_created }));
+    const r = await fetch('https://api.zavu.dev/v1/messages?limit=100', { headers });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) { res.status(401).json({ error: 'unauthorized_zavu' }); return; }
+    const items = (d && d.items) || [];
+    const messages = items.map(m => ({
+      // En Zavu, los mensajes entrantes llegan con status 'received'.
+      direction: m.status === 'received' ? 'inbound' : 'outbound',
+      from: m.from || '',
+      to: m.to || '',
+      body: m.text || '',
+      date: m.createdAt || m.updatedAt || new Date().toISOString()
+    }));
     res.status(200).json({ messages });
   } catch (e) {
     res.status(200).json({ messages: [], error: String(e) });
