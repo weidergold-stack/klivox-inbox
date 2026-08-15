@@ -342,7 +342,8 @@ function renderConvs(){
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
     const unread=last&&last.direction==='inbound';
-    const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(last.body)||'—')) : 'Nuevo chat — escribe el primer mensaje';
+    const lastTxt=last?(last.body|| (last.type&&last.type!=='text'?('['+last.type+']'):'') ):'';
+    const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(lastTxt)||'—')) : 'Nuevo chat — escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
     return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
       <div class="av">${esc(initials(nameOf(c.num)))}</div>
@@ -372,7 +373,14 @@ function renderThread(num){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
   }else{
     th.innerHTML=c.msgs.map(m=>{const cls=m.direction==='inbound'?'in':'out';
-      return `<div class="bub ${cls}">${esc(m.body)||'<i>(sin texto)</i>'}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
+      let media='';
+      if(m.mediaUrl){
+        if(m.type==='image'||(m.mimeType||'').indexOf('image/')===0){media='<img src="'+esc(m.mediaUrl)+'" loading="lazy" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer" onclick="window.open(this.src)"/>';}
+        else{media='<a href="'+esc(m.mediaUrl)+'" target="_blank" rel="noopener" style="color:#22d3ee;text-decoration:underline">📎 '+esc(m.filename||'Ver archivo')+'</a>';}
+      } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
+      const bd=esc(m.body);
+      const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
+      return `<div class="bub ${cls}">${inner}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
   }
   th.scrollTop=th.scrollHeight;
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
