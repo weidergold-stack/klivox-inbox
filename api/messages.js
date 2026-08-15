@@ -3,7 +3,8 @@
 // en Zavu los entrantes NO siempre llegan con status 'received' (p.ej. 'delivered').
 // Se usan los endpoints de conversaciones: cada hilo trae su 'contactIdentifier'
 // (el numero del paciente); todo mensaje cuyo 'from' sea ese contacto es entrante.
-// Devuelve el formato que espera index.html: { messages:[{direction,from,to,body,date}] }
+// Incluye multimedia (imagen/archivo): type + mediaUrl + filename para verlo en la bandeja.
+// Devuelve el formato que espera index.html: { messages:[{direction,from,to,body,type,mediaUrl,filename,mimeType,date}] }
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), INBOX_PASSWORD
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
@@ -36,11 +37,16 @@ module.exports = async (req, res) => {
       for (const m of items) {
         // Entrante si el remitente es el contacto del hilo (por string exacto o por digitos).
         const inbound = !!(m.from && (m.from === contact || (cdig && norm(m.from) === cdig)));
+        const ct = m.content || {};
         messages.push({
           direction: inbound ? 'inbound' : 'outbound',
           from: m.from || '',
           to: m.to || '',
           body: m.text || '',
+          type: m.messageType || 'text',
+          mediaUrl: ct.mediaUrl || '',
+          filename: ct.filename || '',
+          mimeType: ct.mimeType || '',
           date: m.createdAt || m.updatedAt || new Date().toISOString()
         });
       }
