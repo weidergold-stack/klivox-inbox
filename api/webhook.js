@@ -68,11 +68,12 @@ module.exports = async (req, res) => {
     if (!ev || ev.type !== 'message.inbound') return done(); // ignora eventos de entrega, etc.
 
     const data = ev.data || {};
-    const from = (data.from || '').trim();
+    const from = (data.from || '').trim();     // numero del paciente
     const body = (data.text || '').trim();
+    const myNum = (data.to || '').replace(/\D/g, ''); // NUESTRO numero (el sender)
     if (!from || !body) return done(); // por ahora solo texto
 
-    // Interruptor de pausa: global o por conversación (Redis)
+    // Interruptor de pausa: global o por conversación (Redis) — claves aisladas de Tania
     if ((await kvGet('tania_bot_paused')) === '1') return done();
     if ((await kvGet('tania_paused:' + from)) === '1') return done();
 
@@ -93,19 +94,24 @@ module.exports = async (req, res) => {
       );
     } catch (_) { msgs = []; }
 
+    // LOG TEMPORAL DE DIAGNOSTICO (quitar despues de validar)
+    try { console.log('ZDBG ' + JSON.stringify({ to: data.to, from: data.from, myNum: myNum, sample: (msgs[0] || null) }).slice(0, 800)); } catch (_) {}
+
+    // Direccion robusta: un mensaje es SALIENTE si su 'from' es NUESTRO numero.
+    const isOutbound = (m) => myNum && ((m.from || '').replace(/\D/g, '') === myNum);
+
     const now = Date.now();
     const windowMs = HUMAN_WINDOW_MIN * 60 * 1000;
     const recentHuman = msgs.some(m => {
-      const isOut = m.status !== 'received';
       const isBot = (m.text || '').includes(BOT_MARK);
       const t = m.createdAt ? new Date(m.createdAt).getTime() : 0;
-      return isOut && !isBot && (now - t) < windowMs;
+      return isOutbound(m) && !isBot && (now - t) < windowMs;
     });
     if (recentHuman) return done();
 
     let hist = msgs
       .map(m => ({
-        role: m.status === 'received' ? 'user' : 'assistant',
+        role: isOutbound(m) ? 'assistant' : 'user',
         text: (m.text || '').replace(BOT_MARK, '').trim(),
         t: m.createdAt ? new Date(m.createdAt).getTime() : 0
       }))
@@ -142,10 +148,17 @@ module.exports = async (req, res) => {
 
     reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
 
-    await fetch(ZAVU + '/messages', {
-      method: 'POST', headers: zh,
-      body: JSON.stringify({ to: from, channel: 'whatsapp', text: reply + BOT_MARK })
-    });
+    // Enviar la respuesta y registrar el resultado (log temporal)
+    try {
+      const sr = await fetch(ZAVU + '/messages', {
+        method: 'POST', headers: zh,
+        body: JSON.stringify({ to: from, channel: 'whatsapp', text: reply + BOT_MARK })
+      });
+      const st = await sr.text();
+      console.log('ZSEND ' + sr.status + ' ' + st.slice(0, 300));
+    } catch (e) {
+      console.log('ZSEND_ERR ' + String(e).slice(0, 300));
+    }
 
     return done();
   } catch (e) {
