@@ -1,0 +1,68 @@
+// api/usage.js — Métricas de uso para el panel (desde Zavu).
+// Cuenta los mensajes del mes en curso y suma el gasto de proveedor (Meta) del periodo.
+// Zavu NO expone un contador de plan por API: el limite (2000) es de NUESTRO negocio
+// (umbral Esencial -> Pro). Aqui lo calculamos contando /v1/messages del mes.
+// Devuelve: { count, limit, spentMeta, spentTotal, plan, balance }
+// Env: ZAVU_API_KEY, INBOX_PASSWORD
+const LIMIT_ESENCIAL = 2000; // umbral de mensajes/mes para sugerir pasar a Pro
+const MAX_PAGES = 30;        // tope de paginacion (30 x 100 = 3000 msgs/mes)
+
+module.exports = async (req, res) => {
+  if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
+    res.status(401).json({ error: 'unauthorized' }); return;
+  }
+  const KEY = process.env.ZAVU_API_KEY;
+  const ZAVU = 'https://api.zavu.dev/v1';
+  const H = { Authorization: 'Bearer ' + KEY };
+
+  const now = new Date();
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const num = (x) => (typeof x === 'number' ? x : 0);
+
+  let count = 0, spentMeta = 0, spentTotal = 0, cursor = '', pages = 0, truncated = false;
+  try {
+    do {
+      const url = ZAVU + '/messages?limit=100' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+      const r = await fetch(url, { headers: H });
+      if (r.status === 401) { res.status(401).json({ error: 'unauthorized_zavu' }); return; }
+      const d = await r.json().catch(() => ({}));
+      const items = (d && d.items) || [];
+      for (const m of items) {
+        const t = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+        if (t >= monthStart) {
+          count++;
+          spentMeta += num(m.costProvider);
+          spentTotal += (typeof m.costTotal === 'number') ? m.costTotal : (num(m.cost) + num(m.costProvider));
+        }
+      }
+      cursor = (d && d.nextCursor) || '';
+      pages++;
+      if (pages >= MAX_PAGES) { truncated = !!cursor; break; }
+    } while (cursor);
+  } catch (_) { /* devuelve lo acumulado */ }
+
+  // Balance de la sub-cuenta (gasto total acumulado, en centavos)
+  let balance = null;
+  try {
+    const br = await fetch(ZAVU + '/balance', { headers: H });
+    const bd = await br.json().catch(() => ({}));
+    if (bd && (typeof bd.totalSpent === 'number' || typeof bd.balance === 'number')) {
+      balance = {
+        totalSpent: typeof bd.totalSpent === 'number' ? bd.totalSpent / 100 : null,
+        balance: typeof bd.balance === 'number' ? bd.balance / 100 : null,
+        currency: bd.currency || 'usd'
+      };
+    }
+  } catch (_) {}
+
+  const round = (n) => Math.round(n * 10000) / 10000;
+  res.status(200).json({
+    count,
+    limit: LIMIT_ESENCIAL,
+    spentMeta: round(spentMeta),
+    spentTotal: round(spentTotal),
+    plan: count > LIMIT_ESENCIAL ? 'Pro' : 'Esencial',
+    truncated,
+    balance
+  });
+};
