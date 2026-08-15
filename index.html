@@ -13,12 +13,15 @@
   input,textarea{font-family:inherit;background:var(--panel2);border:1px solid var(--brd);border-radius:11px;color:var(--txt);outline:none;font-size:16px}
   input:focus,textarea:focus{border-color:var(--cyan)}
   .btn{background:var(--grad);border:none;color:#04121f;font-weight:700;font-family:inherit;font-size:15px;padding:13px 18px;border-radius:11px;cursor:pointer;width:100%}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
   .logo{width:52px;height:52px;border-radius:14px;background:var(--grad);display:grid;place-items:center;font-weight:800;font-size:24px;color:#04121f}
   #login{height:100dvh;display:grid;place-items:center;padding:20px}
   .card{background:var(--panel);border:1px solid var(--brd);border-radius:18px;padding:34px;width:340px;max-width:100%;text-align:center}
   .card .logo{margin:0 auto 16px}
   .card h1{font-size:19px;margin-bottom:4px}
   .card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .card .lock{width:64px;height:64px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;font-size:30px;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.35)}
+  .card .privacy{margin-top:18px;font-size:11px;color:var(--muted);line-height:1.55}
   #login input{width:100%;padding:13px 14px;margin-bottom:12px}
   .err{color:#fca5a5;font-size:12.5px;margin-top:8px;min-height:16px}
   #app{display:grid;grid-template-columns:340px 1fr;height:100dvh}
@@ -28,8 +31,6 @@
   .side-h b{font-size:15px}.side-h small{display:block;color:var(--cyan);font-size:11px}
   .ico{background:none;border:1px solid var(--brd);color:var(--txt);border-radius:9px;width:38px;height:38px;font-size:17px;cursor:pointer;display:grid;place-items:center;flex:0 0 auto}
   .ico:hover{background:rgba(255,255,255,.05)}
-  .botbtn.active{border-color:rgba(37,211,102,.5);color:#4ade80}
-  .botbtn.paused{border-color:rgba(252,165,165,.6);color:#fca5a5;background:rgba(252,165,165,.10)}
   .searchwrap{padding:10px 14px;border-bottom:1px solid var(--brd)}
   .searchwrap input{width:100%;padding:10px 14px;font-size:15px}
   .usage{padding:6px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
@@ -136,12 +137,13 @@
 
 <div id="login">
   <div class="card">
-    <div class="logo">🦷</div>
-    <h1>Dra. Tania Lozano</h1>
-    <p>Consultorio Odontológico</p>
-    <input id="pass" type="password" placeholder="Contraseña de acceso" autocomplete="current-password"/>
-    <button class="btn" onclick="login()">Entrar</button>
+    <div class="lock">🔒</div>
+    <h1>Acceso privado</h1>
+    <p>Panel exclusivo de la <b style="color:var(--txt)">Dra. Tania Lozano</b><br>Consultorio Odontológico</p>
+    <input id="pass" type="password" placeholder="Tu clave personal" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="btn" id="loginBtn" onclick="login()">🔓 Entrar de forma segura</button>
     <div class="err" id="loginErr"></div>
+    <div class="privacy">🛡️ Solo tú tienes esta clave. Conexión cifrada; tus conversaciones son privadas.</div>
   </div>
 </div>
 
@@ -152,7 +154,7 @@
       <div style="flex:1;min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dra. Tania Lozano</b><small style="color:var(--muted)">Consultorio Odontológico</small></div>
       <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
       <button class="ico" title="Iniciar conversación con plantilla" onclick="openStartConv()">🚀</button>
-      <button class="ico" title="Actualizar" onclick="load();loadUsage()">↻</button>
+      <button class="ico" title="Salir" onclick="logout()">⎋</button>
     </div>
     <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div>
     <div class="usage loading" id="usage" title="Consumo del mes en curso">
@@ -253,11 +255,28 @@ function subAlertModal(){
    '</div></div>';
 }
 
+let loginTries=parseInt(localStorage.getItem('kv_tries')||'0',10);
 async function login(){
-  PASS=document.getElementById('pass').value.trim();
-  document.getElementById('loginErr').textContent='';
-  const r=await fetch('/api/messages',{headers:hdr()});
-  if(r.status===401){document.getElementById('loginErr').textContent='Contraseña incorrecta.';return;}
+  const btn=document.getElementById('loginBtn');
+  const errEl=document.getElementById('loginErr');
+  PASS=(document.getElementById('pass').value||'').trim();
+  if(errEl)errEl.textContent='';
+  if(!PASS){if(errEl)errEl.textContent='Ingresa tu clave personal.';return;}
+  if(btn)btn.disabled=true;
+  let r;
+  try{ r=await fetch('/api/messages',{headers:hdr()}); }
+  catch(e){ if(errEl)errEl.textContent='Sin conexión. Intenta de nuevo.'; if(btn)btn.disabled=false; return; }
+  if(r.status===401){
+    loginTries++; localStorage.setItem('kv_tries',String(loginTries));
+    if(loginTries>=5){
+      let s=30;
+      const tick=()=>{ if(s<=0){loginTries=0;localStorage.setItem('kv_tries','0');if(errEl)errEl.textContent='';if(btn)btn.disabled=false;} else {if(errEl)errEl.textContent='🔒 Demasiados intentos. Espera '+s+' s por seguridad.';s--;setTimeout(tick,1000);} };
+      tick(); return;
+    }
+    if(errEl)errEl.textContent='Clave incorrecta. Intento '+loginTries+' de 5.';
+    if(btn)btn.disabled=false; return;
+  }
+  loginTries=0; localStorage.setItem('kv_tries','0');
   localStorage.setItem('kv_pass',PASS);
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -297,28 +316,7 @@ async function loadChatBotState(num){
     if(!r.ok)return;
     const d=await r.json();
     chatPaused[num]=!!d.paused;
-    if(current===num)paintChatBotBtn(num);
   }catch(e){}
-}
-function paintChatBotBtn(num){
-  const b=document.getElementById('chatBotBtn');
-  if(!b)return;
-  const p=!!chatPaused[num];
-  b.classList.toggle('paused',p);
-  b.classList.toggle('active',!p);
-  b.title=p?'Bot pausado en este chat — toca para activar':'Bot activo en este chat — toca para pausar';
-}
-async function toggleChatBot(){
-  if(!current)return;
-  const num=current, next=!chatPaused[num];
-  if(next && !confirm('¿Pausar el bot solo en este chat? Tú lo atenderás manualmente.')) return;
-  const b=document.getElementById('chatBotBtn');if(b)b.disabled=true;
-  try{
-    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,paused:next})});
-    const d=await r.json();
-    if(d&&typeof d.paused==='boolean'){chatPaused[num]=d.paused;paintChatBotBtn(num);}
-  }catch(e){}
-  if(b)b.disabled=false;
 }
 
 async function loadMetaTemplates(){
@@ -470,7 +468,7 @@ function openNewChat(){
     <label>Número de WhatsApp (con código de país)</label>
     <input id="ncNum" placeholder="+57 300 123 4567" inputmode="tel"/>
     <label>Nombre del contacto (opcional)</label>
-    <input id="ncName" placeholder="Ej: Dra. Laura Pérez"/>
+    <input id="ncName" placeholder="Ej: Laura Pérez"/>
     <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="createChat()">Abrir chat</button></div>
     <div class="muted-note">Podrás escribir de una vez si el contacto te escribió en las últimas 24 h. Si no, usa 🚀 para iniciar con una plantilla aprobada.</div>
    </div></div>`;
@@ -498,7 +496,7 @@ function openStartConv(){
     <label>Número de WhatsApp (con código de país)</label>
     <input id="scNum" placeholder="+57 300 123 4567" inputmode="tel"/>
     <label>Nombre del contacto (opcional)</label>
-    <input id="scName" placeholder="Ej: Dra. Laura Pérez"/>
+    <input id="scName" placeholder="Ej: Laura Pérez"/>
     <label>Plantilla aprobada *</label>
     ${approved.length?`<select id="scTpl" class="mt-sel" onchange="scRenderVars()"><option value="">Selecciona una plantilla…</option>${opts}</select>`:'<div class="muted-note" style="color:#fca5a5">No hay plantillas aprobadas todavía. Crea una en 📋 y espera la aprobación de Meta.</div>'}
     <div id="scVarsBox"></div>
