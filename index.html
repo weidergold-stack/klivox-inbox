@@ -296,7 +296,8 @@ function renderConvs(){
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
     const unread=last&&last.direction==='inbound';
-    const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(last.body)||'—')) : 'Nuevo chat — escribe el primer mensaje';
+    const prevBody=last?(last.type==='media'?('📷 '+(esc(last.body)||'Imagen')):(esc(last.body)||'—')):'';
+    const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+prevBody) : 'Nuevo chat — escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
     return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
       <div class="av">${esc(initials(nameOf(c.num)))}</div>
@@ -325,8 +326,10 @@ function renderThread(num){
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
   }else{
-    th.innerHTML=c.msgs.map(m=>{const cls=m.direction==='inbound'?'in':'out';
-      return `<div class="bub ${cls}">${esc(m.body)||'<i>(sin texto)</i>'}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
+    th.innerHTML=c.msgs.map(function(m){var cls=m.direction==='inbound'?'in':'out';var inner;
+      if(m.type==='media'&&m.mediaUrl){var u=esc(m.mediaUrl);inner='<a href="'+u+'" target="_blank" rel="noopener"><img src="'+u+'" alt="adjunto" style="max-width:230px;max-height:300px;border-radius:10px;display:block" onerror="this.onerror=null;this.outerHTML=&#39;📎 <u>Ver archivo</u>&#39;"/></a>'+(m.body?'<div style="margin-top:6px">'+esc(m.body)+'</div>':'');}
+      else{inner=esc(m.body)||'<i>(sin texto)</i>';}
+      return '<div class="bub '+cls+'">'+inner+'<span class="t">'+fmtTime(m.date)+'</span></div>';}).join('');
   }
   th.scrollTop=th.scrollHeight;
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
