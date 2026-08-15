@@ -1,10 +1,9 @@
-// api/webhook.js — Bot de auto-respuesta de Klivox sobre Zavu (WhatsApp Cloud API).
+// api/webhook.js — Bot de auto-respuesta (Zavu / WhatsApp Cloud API) para la instancia de Tania.
 //
-// - Zavu llama a este endpoint con el evento "message.inbound" cuando entra un mensaje.
-// - El bot marca sus respuestas con un caracter invisible (BOT_MARK): contesta cada
-//   mensaje del paciente, pero se aparta si un HUMANO respondió manual (relevo).
-// - Respeta el interruptor de pausa (global o por conversación) guardado en Redis.
-// - Lee el historial reciente en Zavu para dar contexto a Claude.
+// ESTADO: INACTIVO por diseño. El guion (SYSTEM_PROMPT) esta vacio a proposito:
+// la Dra. Tania atiende manual desde la bandeja. La infraestructura del bot queda lista;
+// para activarlo en el futuro basta con escribir el guion en SYSTEM_PROMPT (abajo) y
+// desplegar: el bot empezara a responder automaticamente con relevo humano y pausa.
 //
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), ANTHROPIC_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN
 
@@ -15,40 +14,11 @@ const BOT_MARK = '​'; // marca invisible: distingue respuestas del bot de las 
 const ZAVU = 'https://api.zavu.dev/v1';
 
 // ============================================================================
-// BASE DE CONOCIMIENTO — edita este bloque para "alimentar" al bot.
+// GUION DEL BOT — VACIO = bot inactivo (atencion 100% manual).
+// Para activar el bot en el futuro, escribe aqui el guion del consultorio de Tania
+// (quien es, servicios, tono, que hacer ante citas/precios) y vuelve a desplegar.
 // ============================================================================
-const SYSTEM_PROMPT = `Eres el asistente virtual de WhatsApp de "Klivox".
-
-## Quienes somos
-En Klivox unimos tecnologia, inteligencia artificial y marketing para hacer crecer negocios, con un foco fuerte en el sector odontologico y de la salud. Nacimos de odontologos para odontologos: conocemos los sillones vacios y lo dificil que es captar pacientes. Tambien desarrollamos productos propios de tecnologia para otros ambitos.
-
-## Que ofrecemos
-1. Clinify (historiaclinify.com): software de historia clinica dental en la nube. Incluye historia clinica digital, odontograma interactivo, agenda, consentimientos y facturacion. En espanol y con 14 dias de prueba gratis.
-2. Agencia de marketing: manejo de redes sociales, contenido y estrategia para atraer y fidelizar pacientes o clientes.
-3. Anuncios rentables en Meta Ads: creamos y gestionamos campanas de Facebook e Instagram que atraen clientes rentables, con retorno medible.
-4. Chatbot / agente de WhatsApp con IA: atencion automatizada que responde, agenda y hace seguimiento 24/7 (como esta conversacion).
-5. CRM: sistema para gestionar y dar seguimiento a tus pacientes o clientes.
-6. Mielo: nuestra app de citas (dating), un desarrollo propio para conectar personas.
-Tambien hacemos planeacion 3D de implantes, guias quirurgicas y desarrollos a medida.
-
-## Precios
-Nunca des precios ni cifras. Primero entiende bien que necesita la persona (que tipo de negocio o consultorio tiene, que producto le interesa, que problema quiere resolver). Cuando tengas clara la necesidad, remite a un asesor para un precio exacto y pide su nombre para agilizar.
-
-## Atencion
-24 horas.
-
-## Contacto
-Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
-
-## Reglas de conversacion
-- Tono cercano, profesional, claro y breve. Espanol para WhatsApp: mensajes cortos (maximo 4-5 lineas), 1-2 emojis con moderacion.
-- Identifica primero que le interesa (Clinify, marketing, anuncios en Meta, chatbot, CRM o Mielo) y responde enfocado en eso.
-- Si es un saludo o el primer mensaje, presentate en 1-2 lineas y pregunta en que puede ayudar. No repitas el saludo si ya saludaste antes.
-- Importante: Mielo (dating) es para publico general, no para odontologos; si preguntan por Mielo, atiendelo como un producto aparte.
-- Ante urgencias, quejas, solicitud de agendar, pedido de precio/cotizacion o temas complejos: no inventes datos; traslada a un asesor con calidez, avisa que le contactara muy pronto y pide su nombre y en que ayudarle.
-- No uses formato Markdown ni asteriscos para negritas; WhatsApp no los interpreta. Escribe en texto plano y natural.
-- Nunca prometas cosas que no sabes ni des precios especificos.
-- Manten cada respuesta enfocada, util y orientada a avanzar hacia una conversacion con el equipo.`;
+const SYSTEM_PROMPT = ``;
 // ============================================================================
 
 async function kvGet(key) {
@@ -64,6 +34,9 @@ async function kvGet(key) {
 module.exports = async (req, res) => {
   const done = () => res.status(200).json({ ok: true });
   try {
+    // Bot inactivo mientras no haya guion configurado (atencion manual).
+    if (!SYSTEM_PROMPT.trim()) return done();
+
     const ev = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     if (!ev || ev.type !== 'message.inbound') return done(); // ignora eventos de entrega, etc.
 
@@ -93,9 +66,6 @@ module.exports = async (req, res) => {
         ((m.from || '').replace(/\D/g, '') === dig) || ((m.to || '').replace(/\D/g, '') === dig)
       );
     } catch (_) { msgs = []; }
-
-    // LOG TEMPORAL DE DIAGNOSTICO (quitar despues de validar)
-    try { console.log('ZDBG ' + JSON.stringify({ to: data.to, from: data.from, myNum: myNum, sample: (msgs[0] || null) }).slice(0, 800)); } catch (_) {}
 
     // Direccion robusta: un mensaje es SALIENTE si su 'from' es NUESTRO numero.
     const isOutbound = (m) => myNum && ((m.from || '').replace(/\D/g, '') === myNum);
@@ -132,7 +102,7 @@ module.exports = async (req, res) => {
     while (messages.length && messages[0].role !== 'user') messages.shift();
     if (!messages.length) messages.push({ role: 'user', content: body || 'Hola' });
 
-    let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
+    let reply = '';
     if (AKEY) {
       try {
         const ar = await fetch('https://api.anthropic.com/v1/messages', {
@@ -143,22 +113,16 @@ module.exports = async (req, res) => {
         const ad = await ar.json();
         const txt = ad && ad.content && ad.content[0] && ad.content[0].text;
         if (txt) reply = txt.trim();
-      } catch (_) { /* usa el mensaje de respaldo */ }
+      } catch (_) { /* sin respuesta si falla */ }
     }
+    if (!reply) return done();
 
     reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
 
-    // Enviar la respuesta y registrar el resultado (log temporal)
-    try {
-      const sr = await fetch(ZAVU + '/messages', {
-        method: 'POST', headers: zh,
-        body: JSON.stringify({ to: from, channel: 'whatsapp', text: reply + BOT_MARK })
-      });
-      const st = await sr.text();
-      console.log('ZSEND ' + sr.status + ' ' + st.slice(0, 300));
-    } catch (e) {
-      console.log('ZSEND_ERR ' + String(e).slice(0, 300));
-    }
+    await fetch(ZAVU + '/messages', {
+      method: 'POST', headers: zh,
+      body: JSON.stringify({ to: from, channel: 'whatsapp', text: reply + BOT_MARK })
+    });
 
     return done();
   } catch (e) {
