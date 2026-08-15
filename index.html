@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Klivox · Bandeja WhatsApp</title>
+<title>Dra. Tania Lozano · Consultorio Odontológico</title>
 <style>
   :root{--bg:#0a0f1c;--panel:#111a2e;--panel2:#0d1526;--panel3:#16233d;--brd:rgba(255,255,255,.09);--txt:#e9eefb;--muted:#8a98b8;--cyan:#22d3ee;--blue:#3b82f6;--green:#25d366;--grad:linear-gradient(120deg,#3b82f6,#22d3ee)}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -32,26 +32,27 @@
   .botbtn.paused{border-color:rgba(252,165,165,.6);color:#fca5a5;background:rgba(252,165,165,.10)}
   .searchwrap{padding:10px 14px;border-bottom:1px solid var(--brd)}
   .searchwrap input{width:100%;padding:10px 14px;font-size:15px}
-  .usage{padding:11px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
-  .usage-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
-  .usage-row .u-count{font-size:13px;font-weight:700}
-  .usage-row .u-count b{color:var(--cyan)}
-  .usage-bar{height:7px;border-radius:5px;background:var(--panel3);overflow:hidden}
+  .usage{padding:6px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
+  .usage-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+  .usage-row .u-count{font-size:10.5px;font-weight:600;color:var(--muted)}
+  .usage-row .u-count b{color:var(--txt);font-weight:700}
+  .usage-row .badge{font-size:9px;padding:1px 6px;opacity:.85}
+  .usage-bar{height:4px;border-radius:4px;background:var(--panel3);overflow:hidden}
   .usage-fill{height:100%;width:0;background:var(--grad);transition:width .5s ease}
   .usage-fill.warn{background:linear-gradient(120deg,#f59e0b,#fbbf24)}
   .usage-fill.over{background:linear-gradient(120deg,#ef4444,#f87171)}
-  .usage-row2{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:11.5px;color:var(--muted)}
+  .usage-row2{display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:9.5px;color:var(--muted)}
   .usage-row2 b{color:var(--txt);font-weight:600}
   .usage.loading{opacity:.55}
-  .sub{padding:11px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
-  .sub-top{font-weight:700;font-size:12.5px}
-  .sub-sub{color:var(--muted);font-size:11.5px;margin-top:3px}
-  .sub-days{color:var(--cyan);font-size:11.5px;margin-top:3px;font-weight:600}
+  .sub{padding:6px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
+  .sub-top{font-weight:600;font-size:10.5px;color:var(--muted)}
+  .sub-sub{color:var(--muted);font-size:9.5px;margin-top:1px}
+  .sub-days{color:var(--muted);font-size:9.5px;margin-top:1px;font-weight:600}
   .sub.warn{background:rgba(245,158,11,.10);border-left:3px solid #f59e0b}
-  .sub.warn .sub-days{color:#fbbf24}
-  .sub-badge{background:rgba(245,158,11,.2);color:#fbbf24;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px}
-  .sub-pay{display:block;margin-top:8px;text-align:center;background:var(--grad);color:#04121f;font-weight:700;padding:8px;border-radius:9px;text-decoration:none;font-size:13px;cursor:pointer}
-  .sub-pay.off{background:var(--panel3);color:var(--muted);cursor:default}
+  .sub.warn .sub-top,.sub.warn .sub-days{color:#fbbf24}
+  .sub-badge{background:rgba(245,158,11,.2);color:#fbbf24;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:4px}
+  .sub-pay{display:block;margin-top:7px;text-align:center;background:var(--grad);color:#04121f;font-weight:700;padding:7px;border-radius:9px;text-decoration:none;font-size:12.5px;cursor:pointer}
+  .sub-pay.off{background:var(--panel3);color:var(--muted);cursor:default;font-weight:500}
   .convs{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
   .conv{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;display:flex;gap:11px;align-items:center}
   .conv:hover{background:rgba(255,255,255,.03)}
@@ -135,9 +136,9 @@
 
 <div id="login">
   <div class="card">
-    <div class="logo">K</div>
-    <h1>Bandeja WhatsApp</h1>
-    <p>Klivox Automatizaciones</p>
+    <div class="logo">🦷</div>
+    <h1>Dra. Tania Lozano</h1>
+    <p>Consultorio Odontológico</p>
     <input id="pass" type="password" placeholder="Contraseña de acceso" autocomplete="current-password"/>
     <button class="btn" onclick="login()">Entrar</button>
     <div class="err" id="loginErr"></div>
@@ -147,9 +148,8 @@
 <div id="app" class="hidden">
   <div class="side" id="side">
     <div class="side-h">
-      <div class="logo">K</div>
-      <div style="flex:1"><b>Klivox</b><small id="botStatus">● Bot activo</small></div>
-      <button class="ico botbtn active" id="botBtn" title="Bot activo — toca para pausar" onclick="toggleBot()">🤖</button>
+      <div class="logo">🦷</div>
+      <div style="flex:1;min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dra. Tania Lozano</b><small style="color:var(--muted)">Consultorio Odontológico</small></div>
       <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
       <button class="ico" title="Iniciar conversación con plantilla" onclick="openStartConv()">🚀</button>
       <button class="ico" title="Actualizar" onclick="load();loadUsage()">↻</button>
@@ -261,9 +261,9 @@ async function login(){
   localStorage.setItem('kv_pass',PASS);
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  await load();loadMetaTemplates();loadBotState();loadUsage();renderSub();
+  await load();loadMetaTemplates();loadUsage();renderSub();
   if(subDaysLeft()<=3) subAlertModal();
-  setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadBotState,15000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
+  setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
 }
 
 function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
@@ -290,7 +290,6 @@ async function loadUsage(){
   }catch(e){}
 }
 
-let botPaused=false;
 let chatPaused={};
 async function loadChatBotState(num){
   try{
@@ -318,37 +317,6 @@ async function toggleChatBot(){
     const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,paused:next})});
     const d=await r.json();
     if(d&&typeof d.paused==='boolean'){chatPaused[num]=d.paused;paintChatBotBtn(num);}
-  }catch(e){}
-  if(b)b.disabled=false;
-}
-
-async function loadBotState(){
-  try{
-    const r=await fetch('/api/bot-state',{headers:hdr()});
-    if(!r.ok)return;
-    const d=await r.json();
-    botPaused=!!d.paused;
-    renderBotBtn();
-  }catch(e){}
-}
-function renderBotBtn(){
-  const b=document.getElementById('botBtn');
-  const s=document.getElementById('botStatus');
-  if(b){
-    b.classList.toggle('paused',botPaused);
-    b.classList.toggle('active',!botPaused);
-    b.title=botPaused?'Bot en pausa — toca para activar':'Bot activo — toca para pausar';
-  }
-  if(s){s.textContent=botPaused?'⏸ Bot en pausa':'● Bot activo';s.style.color=botPaused?'#fca5a5':'#25d366';}
-}
-async function toggleBot(){
-  const next=!botPaused;
-  if(next && !confirm('¿Pausar el bot? Dejará de responder automáticamente hasta que lo actives.')) return;
-  const b=document.getElementById('botBtn');if(b)b.disabled=true;
-  try{
-    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({paused:next})});
-    const d=await r.json();
-    if(d&&typeof d.paused==='boolean'){botPaused=d.paused;renderBotBtn();}
   }catch(e){}
   if(b)b.disabled=false;
 }
@@ -389,7 +357,7 @@ function renderConvs(){
   let list=Object.values(convs).sort((a,b)=>lastActivity(b)-lastActivity(a));
   if(q) list=list.filter(c=> (nameOf(c.num)+' '+c.num).toLowerCase().includes(q));
   const el=document.getElementById('convs');
-  if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'Aún no hay conversaciones. Cuando alguien escriba a tu WhatsApp aparecerá aquí, o crea un chat con ✚.')+'</div>';return;}
+  if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'Aún no hay conversaciones. Cuando alguien escriba al WhatsApp aparecerá aquí, o crea un chat con ✚.')+'</div>';return;}
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
     const unread=last&&last.direction==='inbound';
@@ -416,9 +384,7 @@ function renderThread(num){
     `<button class="back" onclick="backToList()" aria-label="Volver">←</button>
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
-     <button class="ico botbtn" id="chatBotBtn" title="Bot en este chat" onclick="toggleChatBot()">🤖</button>
      <button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
-  paintChatBotBtn(num);
   const th=document.getElementById('thread');
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
