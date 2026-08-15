@@ -2,8 +2,9 @@
 // Cuenta los mensajes del mes en curso y suma el gasto de proveedor (Meta) del periodo.
 // Zavu NO expone un contador de plan por API: el limite (2000) es de NUESTRO negocio
 // (umbral Esencial -> Pro). Aqui lo calculamos contando /v1/messages del mes.
+// Reinicio (go-live): no cuenta nada anterior al punto SINCE (o INBOX_SINCE).
 // Devuelve: { count, limit, spentMeta, spentTotal, plan, balance }
-// Env: ZAVU_API_KEY, INBOX_PASSWORD
+// Env: ZAVU_API_KEY, INBOX_PASSWORD, INBOX_SINCE (opcional)
 const LIMIT_ESENCIAL = 2000; // umbral de mensajes/mes para sugerir pasar a Pro
 const MAX_PAGES = 30;        // tope de paginacion (30 x 100 = 3000 msgs/mes)
 
@@ -17,6 +18,11 @@ module.exports = async (req, res) => {
 
   const now = new Date();
   const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  // Punto de reinicio (go-live): el contador no cuenta nada anterior a esta fecha.
+  // Reajustable con la variable de entorno INBOX_SINCE. Para meses futuros el
+  // inicio de mes es posterior a SINCE, asi que el conteo mensual sigue normal.
+  const SINCE = process.env.INBOX_SINCE ? Date.parse(process.env.INBOX_SINCE) : Date.parse('2026-08-15T06:22:00Z');
+  const startCount = Math.max(monthStart, SINCE);
   const num = (x) => (typeof x === 'number' ? x : 0);
 
   let count = 0, spentMeta = 0, spentTotal = 0, cursor = '', pages = 0, truncated = false;
@@ -29,7 +35,7 @@ module.exports = async (req, res) => {
       const items = (d && d.items) || [];
       for (const m of items) {
         const t = m.createdAt ? new Date(m.createdAt).getTime() : 0;
-        if (t >= monthStart) {
+        if (t >= startCount) {
           count++;
           spentMeta += num(m.costProvider);
           spentTotal += (typeof m.costTotal === 'number') ? m.costTotal : (num(m.cost) + num(m.costProvider));
