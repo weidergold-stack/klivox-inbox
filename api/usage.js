@@ -2,9 +2,8 @@
 // Cuenta los mensajes del mes en curso y suma el gasto de proveedor (Meta) del periodo.
 // Zavu NO expone un contador de plan por API: el limite (2000) es de NUESTRO negocio
 // (umbral Esencial -> Pro). Aqui lo calculamos contando /v1/messages del mes.
-// Reinicio (go-live): no cuenta nada anterior al punto SINCE (o INBOX_SINCE).
 // Devuelve: { count, limit, spentMeta, spentTotal, plan, balance }
-// Env: ZAVU_API_KEY, INBOX_PASSWORD, INBOX_SINCE (opcional)
+// Env: ZAVU_API_KEY, INBOX_PASSWORD, INBOX_PLAN (opcional, por defecto "Pro")
 const LIMIT_ESENCIAL = 2000; // umbral de mensajes/mes para sugerir pasar a Pro
 const MAX_PAGES = 30;        // tope de paginacion (30 x 100 = 3000 msgs/mes)
 
@@ -67,7 +66,7 @@ module.exports = async (req, res) => {
     limit: LIMIT_ESENCIAL,
     spentMeta: round(spentMeta),
     spentTotal: round(spentTotal),
-    plan: count > LIMIT_ESENCIAL ? 'Pro' : 'Esencial',
+    plan: process.env.INBOX_PLAN || 'Pro',
     truncated,
     balance
   });
