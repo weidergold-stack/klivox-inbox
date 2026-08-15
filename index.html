@@ -132,7 +132,11 @@
     .thread{padding:14px 5%}
     .composer{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
   }
-  </style>
+    #emojiPanel{position:absolute;bottom:66px;left:12px;right:12px;max-width:380px;background:#fff;border:1px solid var(--line2);border-radius:12px;box-shadow:0 8px 30px rgba(11,20,26,.28);padding:8px;display:flex;flex-wrap:wrap;gap:2px;max-height:210px;overflow-y:auto;z-index:30}
+  #emojiPanel .emo{background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:5px 6px;border-radius:8px}
+  #emojiPanel .emo:hover{background:var(--hover)}
+  .composer{position:relative}
+</style>
   
 </head>
 <body>
@@ -180,7 +184,7 @@
     <div class="composer hidden" id="composer">
       <div class="win-warn" id="winWarn">🔒 Pasaron más de 24 h desde el último mensaje. Para responder toca 📋 y envía una plantilla aprobada.</div>
       <div class="row">
-        <button class="tpl" title="Plantillas" onclick="openTemplates()">📋</button>
+        <button class="tpl emo-btn" title="Emojis" onclick="toggleEmoji(event)">😊</button><button class="tpl" title="Plantillas" onclick="openTemplates()">📋</button>
         <button class="tpl att" id="attBtn" title="Adjuntar archivo (PDF, imagen)" onclick="attachFile()">📎</button>
         <input type="file" id="fileInput" style="display:none" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" onchange="onFilePicked(this)"/>
         <textarea id="reply" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
@@ -197,6 +201,15 @@
 let PASS=localStorage.getItem('kv_pass')||'';
 let messages=[], convs={}, current=null, metaTemplates=[];
 let names=JSON.parse(localStorage.getItem('kv_names')||'{}');
+let readMap=JSON.parse(localStorage.getItem('kv_read')||'{}');
+function saveRead(){localStorage.setItem('kv_read',JSON.stringify(readMap));}
+function lastInboundTime(c){let t=0;for(const m of ((c&&c.msgs)||[])){if(m.direction==='inbound'){const x=new Date(m.date).getTime();if(x>t)t=x;}}return t;}
+function markRead(num){const c=convs[num];if(!c)return;const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}}
+const EMOJIS='😀 😃 😄 😁 😆 😊 🙂 😉 😍 😘 🥰 😗 😙 😚 🤗 🤩 🥳 😎 🤓 🧐 🤔 🙃 😌 😴 😪 😝 😜 😋 😛 🤤 🥺 😢 😭 😅 😂 🤣 😳 😬 🙄 😮 😯 👍 👎 👌 🤙 👏 🙌 🙏 💪 ✌️ 🤝 👋 💯 🔥 ✨ ⭐ 🌟 💥 ❤️ 🧡 💛 💚 💙 💜 🤍 🖤 💖 💕 💞 😇 🦷 🪥 🩺 💊 💉 🏥 📅 ⏰ ✅ ☑️ ✔️ ❌ ⚠️ 📎 📷 🎉 🎊'.split(' ').filter(Boolean);
+function closeEmoji(){var p=document.getElementById('emojiPanel');if(p)p.remove();document.removeEventListener('click',emojiOutside,true);}
+function emojiOutside(e){var p=document.getElementById('emojiPanel');if(p&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.emo-btn')))closeEmoji();}
+function toggleEmoji(ev){if(ev)ev.stopPropagation();var p=document.getElementById('emojiPanel');if(p){closeEmoji();return;}var ta=document.getElementById('reply');if(!ta||ta.disabled)return;p=document.createElement('div');p.id='emojiPanel';for(var i=0;i<EMOJIS.length;i++){var b=document.createElement('button');b.type='button';b.className='emo';b.textContent=EMOJIS[i];b.onclick=function(){insertEmoji(this.textContent);};p.appendChild(b);}document.getElementById('composer').appendChild(p);setTimeout(function(){document.addEventListener('click',emojiOutside,true);},0);}
+function insertEmoji(e){var ta=document.getElementById('reply');if(!ta)return;var st=(ta.selectionStart==null)?ta.value.length:ta.selectionStart;var en=(ta.selectionEnd==null)?ta.value.length:ta.selectionEnd;ta.value=ta.value.slice(0,st)+e+ta.value.slice(en);var np=st+e.length;ta.focus();try{ta.setSelectionRange(np,np);}catch(_){}}
 let contacts=JSON.parse(localStorage.getItem('kv_contacts')||'[]');
 let templates=JSON.parse(localStorage.getItem('kv_templates')||'null');
 if(!templates){templates=[
@@ -345,6 +358,7 @@ async function load(){
     }
     for(const num of contacts){ if(!convs[num]) convs[num]={num,msgs:[]}; }
     Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));
+    if(current&&convs[current])markRead(current);
     renderConvs();
     if(current&&convs[current])renderThread(current);
   }catch(e){}
@@ -361,7 +375,7 @@ function renderConvs(){
   if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'Aún no hay conversaciones. Cuando alguien escriba al WhatsApp aparecerá aquí, o crea un chat con ✚.')+'</div>';return;}
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
-    const unread=last&&last.direction==='inbound';
+    const unread=!!last&&last.direction==='inbound'&&current!==c.num&&lastInboundTime(c)>(readMap[c.num]||0);
     const lastTxt=last?(last.body|| (last.type&&last.type!=='text'?('['+last.type+']'):'') ):'';
     const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(lastTxt)||'—')) : 'Nuevo chat — escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
@@ -373,7 +387,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-function open_(num){current=num;renderConvs();renderThread(num);loadChatBotState(num);document.getElementById('app').classList.add('show-thread');}
+function open_(num){current=num;markRead(num);renderConvs();renderThread(num);loadChatBotState(num);document.getElementById('app').classList.add('show-thread');}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){
