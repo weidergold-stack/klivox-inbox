@@ -34,6 +34,19 @@
   .botbtn.paused{border-color:rgba(252,165,165,.6);color:#fca5a5;background:rgba(252,165,165,.10)}
   .searchwrap{padding:10px 14px;border-bottom:1px solid var(--brd)}
   .searchwrap input{width:100%;padding:10px 14px;font-size:15px}
+  /* usage / metricas */
+  .usage{padding:11px 14px;border-bottom:1px solid var(--brd);background:var(--panel2)}
+  .usage-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
+  .usage-row .u-count{font-size:13px;font-weight:700}
+  .usage-row .u-count b{color:var(--cyan)}
+  .usage-bar{height:7px;border-radius:5px;background:var(--panel3);overflow:hidden}
+  .usage-fill{height:100%;width:0;background:var(--grad);transition:width .5s ease}
+  .usage-fill.warn{background:linear-gradient(120deg,#f59e0b,#fbbf24)}
+  .usage-fill.over{background:linear-gradient(120deg,#ef4444,#f87171)}
+  .usage-row2{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:11.5px;color:var(--muted)}
+  .usage-row2 b{color:var(--txt);font-weight:600}
+  .usage.loading{opacity:.55}
+  /* convs */
   .convs{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
   .conv{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;display:flex;gap:11px;align-items:center}
   .conv:hover{background:rgba(255,255,255,.03)}
@@ -133,9 +146,20 @@
       <div style="flex:1"><b>Klivox</b><small id="botStatus">● Bot activo</small></div>
       <button class="ico botbtn active" id="botBtn" title="Bot activo — toca para pausar" onclick="toggleBot()">🤖</button>
       <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
-      <button class="ico" title="Actualizar" onclick="load()">↻</button>
+      <button class="ico" title="Actualizar" onclick="load();loadUsage()">↻</button>
     </div>
     <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div>
+    <div class="usage loading" id="usage" title="Consumo del mes en curso">
+      <div class="usage-row">
+        <span class="u-count" id="uCount"><b>—</b> / 2.000 msgs</span>
+        <span class="badge ok" id="uPlan">Plan —</span>
+      </div>
+      <div class="usage-bar"><div class="usage-fill" id="uFill"></div></div>
+      <div class="usage-row2">
+        <span>Meta este mes: <b id="uMeta">$0.00</b></span>
+        <span id="uTotal"></span>
+      </div>
+    </div>
     <div class="convs" id="convs"></div>
   </div>
   <div class="main">
@@ -165,9 +189,9 @@ let names=JSON.parse(localStorage.getItem('kv_names')||'{}');
 let contacts=JSON.parse(localStorage.getItem('kv_contacts')||'[]');
 let templates=JSON.parse(localStorage.getItem('kv_templates')||'null');
 if(!templates){templates=[
-  {t:'Saludo',m:'¡Hola {nombre}! 👋 Soy de Klivox Automatizaciones. ¿En qué puedo ayudarte hoy?'},
+  {t:'Saludo',m:'¡Hola {nombre}! 👋 ¿En qué puedo ayudarte hoy?'},
   {t:'Agendar',m:'Con gusto te agendamos. ¿Qué día y hora te queda mejor?'},
-  {t:'Precio / asesor',m:'Para darte un precio exacto te conecto con un asesor. ¿Me confirmas tu nombre y lo que necesitas?'},
+  {t:'Precio / asesor',m:'Para darte un precio exacto te conecto con recepción. ¿Me confirmas tu nombre y lo que necesitas?'},
   {t:'Gracias',m:'¡Gracias por escribirnos! Cualquier cosa, aquí estamos. 😊'}
 ];saveTpl();}
 
@@ -190,7 +214,33 @@ async function login(){
   localStorage.setItem('kv_pass',PASS);
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  await load();loadMetaTemplates();loadBotState();setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadBotState,15000);
+  await load();loadMetaTemplates();loadBotState();loadUsage();
+  setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadBotState,15000);setInterval(loadUsage,300000);
+}
+
+/* ---- Métricas de uso (contador de mensajes + gasto Meta) ---- */
+function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
+async function loadUsage(){
+  try{
+    const r=await fetch('/api/usage',{headers:hdr()});
+    if(!r.ok)return;
+    const d=await r.json();
+    const box=document.getElementById('usage');box.classList.remove('loading');
+    const limit=d.limit||2000, count=d.count||0;
+    const pct=Math.min(100, Math.round(count/limit*100));
+    document.getElementById('uCount').innerHTML='<b>'+count.toLocaleString('es-CO')+(d.truncated?'+':'')+'</b> / '+limit.toLocaleString('es-CO')+' msgs';
+    const fill=document.getElementById('uFill');
+    fill.style.width=pct+'%';
+    fill.className='usage-fill'+(count>limit?' over':(pct>=80?' warn':''));
+    const plan=document.getElementById('uPlan');
+    plan.textContent='Plan '+(d.plan||'Esencial');
+    plan.className='badge '+(d.plan==='Pro'?'wait':'ok');
+    document.getElementById('uMeta').textContent=fmtMoney(d.spentMeta);
+    const tot=document.getElementById('uTotal');
+    if(d.balance&&d.balance.totalSpent!=null){tot.innerHTML='Total gastado: <b>'+fmtMoney(d.balance.totalSpent)+'</b>';}
+    else if(d.spentTotal){tot.innerHTML='Zavu: <b>'+fmtMoney(d.spentTotal)+'</b>';}
+    else tot.textContent='';
+  }catch(e){}
 }
 
 let botPaused=false;
@@ -431,7 +481,7 @@ function metaPreview(t){
   return b;
 }
 function renderMetaTemplates(){
-  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Se crean en Twilio y aparecen aquí con su estado.</div>';
+  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Se crean en Zavu y aparecen aquí con su estado.</div>';
   return metaTemplates.map((t,i)=>{
     const bi=badgeInfo[t.status]||badgeInfo.pending;
     const locked=t.status!=='approved';
