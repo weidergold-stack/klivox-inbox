@@ -1,16 +1,18 @@
-// api/webhook.js
-// Bot de auto-respuesta de Klivox para WhatsApp (Twilio -> Claude -> Twilio)
+// api/webhook.js — Bot de auto-respuesta de Klivox sobre Zavu (WhatsApp Cloud API).
 //
-// - Twilio llama a este endpoint SOLO cuando entra un mensaje (inbound).
-// - El bot marca sus respuestas con un caracter invisible (BOT_MARK): contesta
-//   cada mensaje del paciente, pero se aparta si un HUMANO responde manual.
-// - Lee el historial reciente en Twilio para dar contexto a Claude.
-// - Limpia formato Markdown que WhatsApp no interpreta.
+// - Zavu llama a este endpoint con el evento "message.inbound" cuando entra un mensaje.
+// - El bot marca sus respuestas con un caracter invisible (BOT_MARK): contesta cada
+//   mensaje del paciente, pero se aparta si un HUMANO respondió manual (relevo).
+// - Respeta el interruptor de pausa (global o por conversación) guardado en Redis.
+// - Lee el historial reciente en Zavu para dar contexto a Claude.
+//
+// Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), ANTHROPIC_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN
 
 const HUMAN_WINDOW_MIN = 3;
 const HISTORY_MAX = 12;
 const MODEL = 'claude-haiku-4-5-20251001';
 const BOT_MARK = '​'; // marca invisible: distingue respuestas del bot de las manuales
+const ZAVU = 'https://api.zavu.dev/v1';
 
 // ============================================================================
 // BASE DE CONOCIMIENTO — edita este bloque para "alimentar" al bot.
@@ -49,63 +51,63 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia una conversacion con el equipo.`;
 // ============================================================================
 
-module.exports = async (req, res) => {
-  const p = req.body || {};
-  const from = p.From || '';
-  const body = (p.Body || '').trim();
-
-  res.setHeader('Content-Type', 'text/xml');
-  const done = () => res.status(200).send('<Response></Response>');
-
+async function kvGet(key) {
+  const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
+  if (!KU || !KT) return null;
   try {
-    if (!from.startsWith('whatsapp:')) return done();
+    const r = await fetch(KU + '/get/' + encodeURIComponent(key), { headers: { Authorization: 'Bearer ' + KT } });
+    const d = await r.json();
+    return d && d.result;
+  } catch (_) { return null; }
+}
 
-    // Interruptor de pausa (Redis/Upstash): si esta pausado, el bot no responde.
-    try {
-      const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
-      if (KU && KT) {
-        const pr = await fetch(`${KU}/get/klivox_bot_paused`, { headers: { Authorization: `Bearer ${KT}` } });
-        const pd = await pr.json();
-        if (pd && pd.result === '1') return done();
-      }
-    } catch (_) {}
+module.exports = async (req, res) => {
+  const done = () => res.status(200).json({ ok: true });
+  try {
+    const ev = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    if (!ev || ev.type !== 'message.inbound') return done(); // ignora eventos de entrega, etc.
 
-    const SID = process.env.TWILIO_ACCOUNT_SID;
-    const TOKEN = process.env.TWILIO_AUTH_TOKEN;
-    const FROM = process.env.TWILIO_WHATSAPP_FROM;
-    const KEY = process.env.ANTHROPIC_API_KEY;
-    if (!SID || !TOKEN || !FROM) return done();
+    const data = ev.data || {};
+    const from = (data.from || '').trim();
+    const body = (data.text || '').trim();
+    if (!from || !body) return done(); // por ahora solo texto
 
-    const auth = 'Basic ' + Buffer.from(`${SID}:${TOKEN}`).toString('base64');
-    const patientNum = from.replace('whatsapp:', '');
+    // Interruptor de pausa: global o por conversación (Redis)
+    if ((await kvGet('klivox_bot_paused')) === '1') return done();
+    if ((await kvGet('klivox_paused:' + from)) === '1') return done();
 
-    const listUrl = `https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json?PageSize=50`;
+    const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER, AKEY = process.env.ANTHROPIC_API_KEY;
+    if (!KEY) return done();
+    const zh = { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+    if (SENDER) zh['Zavu-Sender'] = SENDER;
+
+    const dig = from.replace(/\D/g, '');
+
+    // Historial reciente (para contexto y relevo humano)
     let msgs = [];
     try {
-      const lr = await fetch(listUrl, { headers: { Authorization: auth } });
+      const lr = await fetch(ZAVU + '/messages?limit=100', { headers: { Authorization: 'Bearer ' + KEY } });
       const ld = await lr.json();
-      msgs = (ld.messages || []).filter(m => {
-        const f = m.from || '', t = m.to || '';
-        return f.includes(patientNum) || t.includes(patientNum);
-      });
+      msgs = (ld.items || []).filter(m =>
+        ((m.from || '').replace(/\D/g, '') === dig) || ((m.to || '').replace(/\D/g, '') === dig)
+      );
     } catch (_) { msgs = []; }
 
     const now = Date.now();
     const windowMs = HUMAN_WINDOW_MIN * 60 * 1000;
-    const recentHumanOutbound = msgs.some(m => {
-      const isOut = (m.direction || '').startsWith('outbound');
-      const isBot = (m.body || '').includes(BOT_MARK);
-      const ts = m.date_sent || m.date_created;
-      const t = ts ? new Date(ts).getTime() : 0;
+    const recentHuman = msgs.some(m => {
+      const isOut = m.status !== 'received';
+      const isBot = (m.text || '').includes(BOT_MARK);
+      const t = m.createdAt ? new Date(m.createdAt).getTime() : 0;
       return isOut && !isBot && (now - t) < windowMs;
     });
-    if (recentHumanOutbound) return done();
+    if (recentHuman) return done();
 
     let hist = msgs
       .map(m => ({
-        role: (m.direction || '').startsWith('inbound') ? 'user' : 'assistant',
-        text: (m.body || '').replace(BOT_MARK, '').trim(),
-        t: m.date_created ? new Date(m.date_created).getTime() : 0
+        role: m.status === 'received' ? 'user' : 'assistant',
+        text: (m.text || '').replace(BOT_MARK, '').trim(),
+        t: m.createdAt ? new Date(m.createdAt).getTime() : 0
       }))
       .filter(m => m.text)
       .sort((a, b) => a.t - b.t)
@@ -125,15 +127,11 @@ module.exports = async (req, res) => {
     if (!messages.length) messages.push({ role: 'user', content: body || 'Hola' });
 
     let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
-    if (KEY) {
+    if (AKEY) {
       try {
         const ar = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': KEY,
-            'anthropic-version': '2023-06-01'
-          },
+          headers: { 'content-type': 'application/json', 'x-api-key': AKEY, 'anthropic-version': '2023-06-01' },
           body: JSON.stringify({ model: MODEL, max_tokens: 400, system: SYSTEM_PROMPT, messages })
         });
         const ad = await ar.json();
@@ -142,17 +140,15 @@ module.exports = async (req, res) => {
       } catch (_) { /* usa el mensaje de respaldo */ }
     }
 
-    // Limpiar Markdown que WhatsApp no interpreta y enviar por Twilio REST
     reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
-    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK });
-    await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
-      method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: sendBody.toString()
+
+    await fetch(ZAVU + '/messages', {
+      method: 'POST', headers: zh,
+      body: JSON.stringify({ to: from, channel: 'whatsapp', text: reply + BOT_MARK })
     });
 
     return done();
   } catch (e) {
-    return done();
+    return res.status(200).json({ ok: true });
   }
 };
