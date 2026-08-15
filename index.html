@@ -143,7 +143,7 @@
     <input id="pass" type="password" placeholder="Tu clave personal" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
     <button class="btn" id="loginBtn" onclick="login()">🔓 Entrar de forma segura</button>
     <div class="err" id="loginErr"></div>
-    <div class="privacy">🛡️ Solo tú tienes esta clave. Conexión cifrada; tus conversaciones son privadas.</div>
+    <div class="privacy">🛡️ Solo tú tienes esta clave. La sesión se cierra sola cada día por seguridad.</div>
   </div>
 </div>
 
@@ -255,6 +255,7 @@ function subAlertModal(){
    '</div></div>';
 }
 
+const SESSION_MS=24*60*60*1000; // la sesión caduca cada 1 día
 let loginTries=parseInt(localStorage.getItem('kv_tries')||'0',10);
 async function login(){
   const btn=document.getElementById('loginBtn');
@@ -277,7 +278,7 @@ async function login(){
     if(btn)btn.disabled=false; return;
   }
   loginTries=0; localStorage.setItem('kv_tries','0');
-  localStorage.setItem('kv_pass',PASS);
+  localStorage.setItem('kv_pass',PASS);localStorage.setItem('kv_login_ts',String(Date.now()));
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   await load();loadMetaTemplates();loadUsage();renderSub();
@@ -699,8 +700,12 @@ function addTemplate(){
 }
 function delTemplate(i){if(confirm('¿Eliminar esta plantilla?')){templates.splice(i,1);saveTpl();openTemplates();}}
 
-function logout(){localStorage.removeItem('kv_pass');location.reload();}
-if(PASS){document.getElementById('pass').value=PASS;login();}
+function logout(){localStorage.removeItem('kv_pass');localStorage.removeItem('kv_login_ts');location.reload();}
+(function(){
+  const ts=parseInt(localStorage.getItem('kv_login_ts')||'0',10);
+  if(PASS && ts && (Date.now()-ts)<SESSION_MS){ document.getElementById('pass').value=PASS; login(); }
+  else { localStorage.removeItem('kv_pass'); PASS=''; }
+})();
 </script>
 </body>
 </html>
