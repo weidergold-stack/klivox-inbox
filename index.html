@@ -137,7 +137,7 @@
   #emojiPanel .emo:hover{background:var(--hover)}
   .composer{position:relative}
   #sub{display:none!important}
-</style>
+.fltwrap{display:flex;gap:6px;padding:2px 12px 8px}.flt{flex:1;border:1px solid var(--line2);background:#fff;color:var(--muted);border-radius:16px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}.flt.active{background:var(--greenL);color:var(--txt);border-color:var(--green)}</style>
   
 </head>
 <body>
@@ -163,7 +163,7 @@
       <button class="ico" title="Iniciar conversación con plantilla" onclick="openStartConv()">🚀</button>
       <button class="ico" title="Salir" onclick="logout()">⎋</button>
     </div>
-    <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div>
+    <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div><div class="fltwrap"><button id="fltAll" class="flt active" onclick="setFilter(false)">Todos</button><button id="fltUnread" class="flt" onclick="setFilter(true)">No leídos</button></div>
     <div class="usage loading" id="usage" title="Consumo del mes en curso">
       <div class="usage-row">
         <span class="u-count" id="uCount"><b>—</b> / 2.000 msgs</span>
@@ -204,8 +204,13 @@ let messages=[], convs={}, current=null, metaTemplates=[];
 let names=JSON.parse(localStorage.getItem('kv_names')||'{}');
 let readMap=JSON.parse(localStorage.getItem('kv_read')||'{}');
 function saveRead(){localStorage.setItem('kv_read',JSON.stringify(readMap));}
+let unreadSet=JSON.parse(localStorage.getItem('kv_unread')||'{}');
+function saveUnread(){localStorage.setItem('kv_unread',JSON.stringify(unreadSet));}
+function isUnread(c){const last=(c&&c.msgs&&c.msgs.length)?c.msgs[c.msgs.length-1]:null;return current!==c.num&&(!!unreadSet[c.num]||(!!last&&last.direction==='inbound'&&lastInboundTime(c)>(readMap[c.num]||0)));}
+function markUnread(num){unreadSet[num]=1;saveUnread();if(typeof backToList==='function')backToList();renderConvs();}
+function setFilter(v){window.__onlyUnread=v;var a=document.getElementById('fltAll'),u=document.getElementById('fltUnread');if(a)a.classList.toggle('active',!v);if(u)u.classList.toggle('active',v);renderConvs();}
 function lastInboundTime(c){let t=0;for(const m of ((c&&c.msgs)||[])){if(m.direction==='inbound'){const x=new Date(m.date).getTime();if(x>t)t=x;}}return t;}
-function markRead(num){const c=convs[num];if(!c)return;const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}}
+function markRead(num){const c=convs[num];if(!c)return;const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}if(unreadSet[num]){delete unreadSet[num];saveUnread();}}
 const EMOJIS='😀 😃 😄 😁 😆 😊 🙂 😉 😍 😘 🥰 😗 😙 😚 🤗 🤩 🥳 😎 🤓 🧐 🤔 🙃 😌 😴 😪 😝 😜 😋 😛 🤤 🥺 😢 😭 😅 😂 🤣 😳 😬 🙄 😮 😯 👍 👎 👌 🤙 👏 🙌 🙏 💪 ✌️ 🤝 👋 💯 🔥 ✨ ⭐ 🌟 💥 ❤️ 🧡 💛 💚 💙 💜 🤍 🖤 💖 💕 💞 😇 🦷 🪥 🩺 💊 💉 🏥 📅 ⏰ ✅ ☑️ ✔️ ❌ ⚠️ 📎 📷 🎉 🎊'.split(' ').filter(Boolean);
 function closeEmoji(){var p=document.getElementById('emojiPanel');if(p)p.remove();document.removeEventListener('click',emojiOutside,true);}
 function emojiOutside(e){var p=document.getElementById('emojiPanel');if(p&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.emo-btn')))closeEmoji();}
@@ -372,12 +377,12 @@ function lastActivity(c){return c.msgs.length? new Date(c.msgs[c.msgs.length-1].
 function renderConvs(){
   const q=(document.getElementById('search').value||'').toLowerCase().trim();
   let list=Object.values(convs).sort((a,b)=>lastActivity(b)-lastActivity(a));
-  if(q) list=list.filter(c=> (nameOf(c.num)+' '+c.num).toLowerCase().includes(q));
+  if(q) list=list.filter(c=> (nameOf(c.num)+' '+c.num).toLowerCase().includes(q));if(window.__onlyUnread) list=list.filter(isUnread);
   const el=document.getElementById('convs');
   if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'Aún no hay conversaciones. Cuando alguien escriba al WhatsApp aparecerá aquí, o crea un chat con ✚.')+'</div>';return;}
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
-    const unread=!!last&&last.direction==='inbound'&&current!==c.num&&lastInboundTime(c)>(readMap[c.num]||0);
+    const unread=isUnread(c);
     const lastTxt=last?(last.body|| (last.type&&last.type!=='text'?('['+last.type+']'):'') ):'';
     const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(lastTxt)||'—')) : 'Nuevo chat — escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
@@ -401,7 +406,7 @@ function renderThread(num){
     `<button class="back" onclick="backToList()" aria-label="Volver">←</button>
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
-     <button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
+     <button class="ico" title="Marcar como no leído" onclick="markUnread('${num}')">📩</button><button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
   const th=document.getElementById('thread');
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
