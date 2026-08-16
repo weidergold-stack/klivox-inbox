@@ -58,6 +58,7 @@ module.exports = async (req, res) => {
         date: m.createdAt || m.updatedAt || new Date().toISOString()
       });
     }
+    out.sort((a, b) => new Date(a.date) - new Date(b.date));
     res.status(200).json({ messages: out });
   } catch (e) {
     res.status(200).json({ messages: [], error: String(e) });
