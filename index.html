@@ -350,7 +350,7 @@ async function load(){
     const r=await fetch('/api/messages',{headers:hdr()});
     if(r.status===401){logout();return;}
     const d=await r.json();
-    messages=(d.messages&&d.messages.length)?d.messages:(messages||[]);
+    messages=((d.messages||[]).length>=(messages||[]).length*0.8)?(d.messages||[]):(messages||[]);
     convs={};
     for(const m of messages){
       const other=(m.direction==='inbound')?fmtNum(m.from):fmtNum(m.to);
