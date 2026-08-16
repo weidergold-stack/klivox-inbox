@@ -305,7 +305,7 @@ async function login(){
   document.getElementById('app').classList.remove('hidden');
   await load();loadMetaTemplates();loadUsage();renderSub();
   if(subDaysLeft()<=3) subAlertModal();
-  setInterval(load,30000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
+  setInterval(load,5000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
 }
 
 function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
