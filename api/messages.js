@@ -1,11 +1,7 @@
-// api/messages.js — historial de mensajes para la bandeja (desde Zavu).
-// La DIRECCION se determina por el contacto del hilo (robusto), no por 'status':
-// en Zavu los entrantes NO siempre llegan con status 'received' (p.ej. 'delivered').
-// Se usan los endpoints de conversaciones: cada hilo trae su 'contactIdentifier'
-// (el numero del paciente); todo mensaje cuyo 'from' sea ese contacto es entrante.
-// Incluye multimedia (imagen/archivo): type + mediaUrl + filename para verlo en la bandeja.
-// Reinicio (go-live): oculta el historial anterior al punto SINCE (o INBOX_SINCE).
-// Devuelve el formato que espera index.html: { messages:[{direction,from,to,body,type,mediaUrl,filename,mimeType,date}] }
+// api/messages.js — historial COMPLETO para la bandeja (desde Zavu).
+// Trae TODAS las conversaciones (paginando por cursor) y sus mensajes en paralelo.
+// La direccion se determina por el contacto del hilo (contactIdentifier).
+// Devuelve: { messages:[{direction,from,to,body,type,mediaUrl,filename,mimeType,date}] }
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), INBOX_PASSWORD, INBOX_SINCE (opcional)
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
@@ -17,35 +13,47 @@ module.exports = async (req, res) => {
   const H = { Authorization: 'Bearer ' + KEY };
   if (SENDER) H['Zavu-Sender'] = SENDER;
   const norm = (s) => (s || '').replace(/\D/g, '');
-  // Punto de reinicio (go-live): oculta el historial anterior a esta fecha.
-  // Se puede reajustar sin tocar el codigo con la variable de entorno INBOX_SINCE.
-  const SINCE = process.env.INBOX_SINCE ? Date.parse(process.env.INBOX_SINCE) : Date.parse('2026-08-15T06:22:00Z');
+  // Punto de reinicio (go-live). Por defecto muestra TODO el historial.
+  const SINCE = process.env.INBOX_SINCE ? Date.parse(process.env.INBOX_SINCE) : Date.parse('2020-01-01T00:00:00Z');
+
+  const MAX_CONV_PAGES = 20;  // hasta 20 x 50 = 1000 conversaciones
+  const MAX_CONVS = 300;      // tope de conversaciones a procesar
+  const CONCURRENCY = 10;     // fetches de mensajes en paralelo
 
   try {
-    const cr = await fetch(ZAVU + '/conversations?limit=50', { headers: H });
-    if (cr.status === 401) { res.status(401).json({ error: 'unauthorized_zavu' }); return; }
-    const cd = await cr.json().catch(() => ({}));
-    const convs = (cd && cd.items) || [];
+    // 1) Traer TODAS las conversaciones (paginando por cursor).
+    let convs = [];
+    let cursor = '';
+    let pages = 0;
+    do {
+      const url = ZAVU + '/conversations?limit=50' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+      const cr = await fetch(url, { headers: H });
+      if (cr.status === 401) { res.status(401).json({ error: 'unauthorized_zavu' }); return; }
+      const cd = await cr.json().catch(() => ({}));
+      const items = (cd && cd.items) || [];
+      convs = convs.concat(items);
+      cursor = (cd && cd.nextCursor) || '';
+      pages++;
+    } while (cursor && pages < MAX_CONV_PAGES && convs.length < MAX_CONVS);
+    convs = convs.slice(0, MAX_CONVS);
 
-    let messages = [];
-    for (const c of convs.slice(0, 30)) {
+    // 2) Mensajes de cada conversacion en paralelo (por lotes) para no demorar.
+    const fetchConv = async (c) => {
       const contact = c.contactIdentifier || '';
       const cdig = norm(contact);
       let items = [];
       try {
-        const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(c.id) + '/messages?limit=100', { headers: H });
+        const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(c.id) + '/messages?limit=200', { headers: H });
         const md = await mr.json().catch(() => ({}));
         items = (md && md.items) || [];
       } catch (_) { items = []; }
-
+      const out = [];
       for (const m of items) {
-        // Reinicio: ignora todo mensaje anterior al punto SINCE.
         const mt = m.createdAt ? new Date(m.createdAt).getTime() : 0;
         if (mt && mt < SINCE) continue;
-        // Entrante si el remitente es el contacto del hilo (por string exacto o por digitos).
         const inbound = !!(m.from && (m.from === contact || (cdig && norm(m.from) === cdig)));
         const ct = m.content || {};
-        messages.push({
+        out.push({
           direction: inbound ? 'inbound' : 'outbound',
           from: m.from || '',
           to: m.to || '',
@@ -57,6 +65,14 @@ module.exports = async (req, res) => {
           date: m.createdAt || m.updatedAt || new Date().toISOString()
         });
       }
+      return out;
+    };
+
+    let messages = [];
+    for (let i = 0; i < convs.length; i += CONCURRENCY) {
+      const batch = convs.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(batch.map(fetchConv));
+      for (const arr of results) messages = messages.concat(arr);
     }
 
     res.status(200).json({ messages });
