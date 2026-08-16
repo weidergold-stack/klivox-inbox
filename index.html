@@ -220,7 +220,8 @@ if(!templates){templates=[
   {t:'Gracias',m:'¡Gracias por escribirnos! Cualquier cosa, aquí estamos. 😊'}
 ];saveTpl();}
 
-function saveNames(){localStorage.setItem('kv_names',JSON.stringify(names));}
+function saveNames(){localStorage.setItem('kv_names',JSON.stringify(names));try{fetch('/api/names',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({names:names})});}catch(_){}}
+async function loadNames(){try{const r=await fetch('/api/names',{headers:hdr()});if(r.ok){const d=await r.json();if(d&&d.names){names=Object.assign({},names,d.names);localStorage.setItem('kv_names',JSON.stringify(names));if(typeof renderConvs==='function')renderConvs();}}}catch(_){}}
 function saveContacts(){localStorage.setItem('kv_contacts',JSON.stringify(contacts));}
 function saveTpl(){localStorage.setItem('kv_templates',JSON.stringify(templates));}
 function hdr(){return{'x-inbox-pass':PASS,'Content-Type':'application/json'}}
@@ -350,7 +351,7 @@ async function load(){
     const r=await fetch('/api/messages',{headers:hdr()});
     if(r.status===401){logout();return;}
     const d=await r.json();
-    messages=((d.messages||[]).length>=(messages||[]).length*0.8)?(d.messages||[]):(messages||[]);
+    messages=((d.messages||[]).length>=(messages||[]).length*0.8)?(d.messages||[]):(messages||[]);if(!window.__nl){window.__nl=1;loadNames();}
     convs={};
     for(const m of messages){
       const other=(m.direction==='inbound')?fmtNum(m.from):fmtNum(m.to);
