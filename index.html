@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>Dra. Tania Lozano · Consultorio Odontológico</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🦷%3C/text%3E%3C/svg%3E"/>
+<title>Dra. Tania Lozano Â· Consultorio OdontolÃ³gico</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3Eð¦·%3C/text%3E%3C/svg%3E"/>
 <style>
 
   :root{--bg:#efeae2;--sidebar:#ffffff;--head:#f0f2f5;--txt:#111b21;--muted:#667781;--muted2:#8696a0;
@@ -143,30 +143,30 @@
 
 <div id="login">
   <div class="card">
-    <div class="lock">🔒</div>
+    <div class="lock">ð</div>
     <h1>Acceso privado</h1>
-    <p>Panel exclusivo de la <b style="color:var(--txt)">Dra. Tania Lozano</b><br>Consultorio Odontológico</p>
+    <p>Panel exclusivo de la <b style="color:var(--txt)">Dra. Tania Lozano</b><br>Consultorio OdontolÃ³gico</p>
     <input id="pass" type="password" placeholder="Tu clave personal" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
-    <button class="btn" id="loginBtn" onclick="login()">🔓 Entrar de forma segura</button>
+    <button class="btn" id="loginBtn" onclick="login()">ð Entrar de forma segura</button>
     <div class="err" id="loginErr"></div>
-    <div class="privacy">🛡️ Solo tú tienes esta clave. La sesión se cierra sola cada día por seguridad.</div>
+    <div class="privacy">ð¡ï¸ Solo tÃº tienes esta clave. La sesiÃ³n se cierra sola cada dÃ­a por seguridad.</div>
   </div>
 </div>
 
 <div id="app" class="hidden">
   <div class="side" id="side">
     <div class="side-h">
-      <div class="logo">🦷</div>
-      <div style="flex:1;min-width:0"><b style="display:block;line-height:1.15">Dra. Tania Lozano</b><small style="color:var(--muted)">Consultorio Odontológico</small></div>
-      <button class="ico" title="Nuevo chat" onclick="openNewChat()">✚</button>
-      <button class="ico" title="Iniciar conversación con plantilla" onclick="openStartConv()">🚀</button>
-      <button class="ico" title="Salir" onclick="logout()">⎋</button>
+      <div class="logo">ð¦·</div>
+      <div style="flex:1;min-width:0"><b style="display:block;line-height:1.15">Dra. Tania Lozano</b><small style="color:var(--muted)">Consultorio OdontolÃ³gico</small></div>
+      <button class="ico" title="Nuevo chat" onclick="openNewChat()">â</button>
+      <button class="ico" title="Iniciar conversaciÃ³n con plantilla" onclick="openStartConv()">ð</button>
+      <button class="ico" title="Salir" onclick="logout()">â</button>
     </div>
-    <div class="searchwrap"><input id="search" placeholder="🔍  Buscar por nombre o número…" oninput="renderConvs()"/></div><div class="fltwrap"><button id="fltAll" class="flt active" onclick="setFilter(false)">Todos</button><button id="fltUnread" class="flt" onclick="setFilter(true)">No leídos</button></div>
+    <div class="searchwrap"><input id="search" placeholder="ð  Buscar por nombre o nÃºmeroâ¦" oninput="renderConvs()"/></div><div class="fltwrap"><button id="fltAll" class="flt active" onclick="setFilter(false)">Todos</button><button id="fltUnread" class="flt" onclick="setFilter(true)">No leÃ­dos</button></div>
     <div class="usage loading" id="usage" title="Consumo del mes en curso">
       <div class="usage-row">
-        <span class="u-count" id="uCount"><b>—</b> / 2.000 msgs</span>
-        <span class="badge ok" id="uPlan">Plan —</span>
+        <span class="u-count" id="uCount"><b>â</b> / 2.000 msgs</span>
+        <span class="badge ok" id="uPlan">Plan â</span>
       </div>
       <div class="usage-bar"><div class="usage-fill" id="uFill"></div></div>
       <div class="usage-row2">
@@ -178,17 +178,17 @@
     <div class="convs" id="convs"></div>
   </div>
   <div class="main">
-    <div class="main-h" id="mainH"><span class="name">Selecciona una conversación</span></div>
-    <div class="empty" id="empty">💬 Elige un chat o crea uno nuevo con ✚</div>
+    <div class="main-h" id="mainH"><span class="name">Selecciona una conversaciÃ³n</span></div>
+    <div class="empty" id="empty">ð¬ Elige un chat o crea uno nuevo con â</div>
     <div class="thread hidden" id="thread"></div>
     <div class="composer hidden" id="composer">
-      <div class="win-warn" id="winWarn">🔒 Pasaron más de 24 h desde el último mensaje. Para responder toca 📋 y envía una plantilla aprobada.</div>
+      <div class="win-warn" id="winWarn">ð Pasaron mÃ¡s de 24 h desde el Ãºltimo mensaje. Para responder toca ð y envÃ­a una plantilla aprobada.</div>
       <div class="row">
-        <button class="tpl emo-btn" title="Emojis" onclick="toggleEmoji(event)">😊</button><button class="tpl" title="Plantillas" onclick="openTemplates()">📋</button>
-        <button class="tpl att" id="attBtn" title="Adjuntar archivo (PDF, imagen)" onclick="attachFile()">📎</button>
+        <button class="tpl emo-btn" title="Emojis" onclick="toggleEmoji(event)">ð</button><button class="tpl" title="Plantillas" onclick="openTemplates()">ð</button>
+        <button class="tpl att" id="attBtn" title="Adjuntar archivo (PDF, imagen)" onclick="attachFile()">ð</button>
         <input type="file" id="fileInput" style="display:none" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" onchange="onFilePicked(this)"/>
-        <textarea id="reply" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
-        <button class="send" onclick="send()">➤</button>
+        <textarea id="reply" placeholder="Escribe una respuestaâ¦" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+        <button class="send" onclick="send()">â¤</button>
       </div>
       <div class="send-err" id="sendErr"></div>
     </div>
@@ -210,7 +210,7 @@ function markUnread(num){unreadSet[num]=1;saveUnread();if(typeof backToList==='f
 function setFilter(v){window.__onlyUnread=v;var a=document.getElementById('fltAll'),u=document.getElementById('fltUnread');if(a)a.classList.toggle('active',!v);if(u)u.classList.toggle('active',v);renderConvs();}
 function lastInboundTime(c){let t=0;for(const m of ((c&&c.msgs)||[])){if(m.direction==='inbound'){const x=new Date(m.date).getTime();if(x>t)t=x;}}return t;}
 function markRead(num){const c=convs[num];if(!c)return;const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}if(unreadSet[num]){delete unreadSet[num];saveUnread();}}
-const EMOJIS='😀 😃 😄 😁 😆 😊 🙂 😉 😍 😘 🥰 😗 😙 😚 🤗 🤩 🥳 😎 🤓 🧐 🤔 🙃 😌 😴 😪 😝 😜 😋 😛 🤤 🥺 😢 😭 😅 😂 🤣 😳 😬 🙄 😮 😯 👍 👎 👌 🤙 👏 🙌 🙏 💪 ✌️ 🤝 👋 💯 🔥 ✨ ⭐ 🌟 💥 ❤️ 🧡 💛 💚 💙 💜 🤍 🖤 💖 💕 💞 😇 🦷 🪥 🩺 💊 💉 🏥 📅 ⏰ ✅ ☑️ ✔️ ❌ ⚠️ 📎 📷 🎉 🎊'.split(' ').filter(Boolean);
+const EMOJIS='ð ð ð ð ð ð ð ð ð ð ð¥° ð ð ð ð¤ ð¤© ð¥³ ð ð¤ ð§ ð¤ ð ð ð´ ðª ð ð ð ð ð¤¤ ð¥º ð¢ ð­ ð ð ð¤£ ð³ ð¬ ð ð® ð¯ ð ð ð ð¤ ð ð ð ðª âï¸ ð¤ ð ð¯ ð¥ â¨ â­ ð ð¥ â¤ï¸ ð§¡ ð ð ð ð ð¤ ð¤ ð ð ð ð ð¦· ðª¥ ð©º ð ð ð¥ ð â° â âï¸ âï¸ â â ï¸ ð ð· ð ð'.split(' ').filter(Boolean);
 function closeEmoji(){var p=document.getElementById('emojiPanel');if(p)p.remove();document.removeEventListener('click',emojiOutside,true);}
 function emojiOutside(e){var p=document.getElementById('emojiPanel');if(p&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.emo-btn')))closeEmoji();}
 function toggleEmoji(ev){if(ev)ev.stopPropagation();var p=document.getElementById('emojiPanel');if(p){closeEmoji();return;}var ta=document.getElementById('reply');if(!ta||ta.disabled)return;p=document.createElement('div');p.id='emojiPanel';for(var i=0;i<EMOJIS.length;i++){var b=document.createElement('button');b.type='button';b.className='emo';b.textContent=EMOJIS[i];b.onclick=function(){insertEmoji(this.textContent);};p.appendChild(b);}document.getElementById('composer').appendChild(p);setTimeout(function(){document.addEventListener('click',emojiOutside,true);},0);}
@@ -218,10 +218,10 @@ function insertEmoji(e){var ta=document.getElementById('reply');if(!ta)return;va
 let contacts=JSON.parse(localStorage.getItem('kv_contacts')||'[]');
 let templates=JSON.parse(localStorage.getItem('kv_templates')||'null');
 if(!templates){templates=[
-  {t:'Saludo',m:'¡Hola {nombre}! 👋 ¿En qué puedo ayudarte hoy?'},
-  {t:'Agendar',m:'Con gusto te agendamos. ¿Qué día y hora te queda mejor?'},
-  {t:'Precio / asesor',m:'Para darte un precio exacto te conecto con recepción. ¿Me confirmas tu nombre y lo que necesitas?'},
-  {t:'Gracias',m:'¡Gracias por escribirnos! Cualquier cosa, aquí estamos. 😊'}
+  {t:'Saludo',m:'Â¡Hola {nombre}! ð Â¿En quÃ© puedo ayudarte hoy?'},
+  {t:'Agendar',m:'Con gusto te agendamos. Â¿QuÃ© dÃ­a y hora te queda mejor?'},
+  {t:'Precio / asesor',m:'Para darte un precio exacto te conecto con recepciÃ³n. Â¿Me confirmas tu nombre y lo que necesitas?'},
+  {t:'Gracias',m:'Â¡Gracias por escribirnos! Cualquier cosa, aquÃ­ estamos. ð'}
 ];saveTpl();}
 
 function saveNames(){localStorage.setItem('kv_names',JSON.stringify(names));try{fetch('/api/names',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({names:names})});}catch(_){}}
@@ -231,7 +231,7 @@ function saveTpl(){localStorage.setItem('kv_templates',JSON.stringify(templates)
 function hdr(){return{'x-inbox-pass':PASS,'Content-Type':'application/json'}}
 function fmtNum(n){return (n||'').replace('whatsapp:','')}
 function nameOf(num){return names[num]||num}
-function initials(s){s=(s||'').trim();const w=s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\s]/g,'').split(/\s+/).filter(Boolean);if(w.length>=2)return w[0][0]+w[1][0];if(w.length===1)return w[0].slice(0,2);const d=s.replace(/\D/g,'');return d.slice(-2)||'#';}
+function initials(s){s=(s||'').trim();const w=s.replace(/[^A-Za-zÃÃÃÃÃÃÃ¡Ã©Ã­Ã³ÃºÃ±\s]/g,'').split(/\s+/).filter(Boolean);if(w.length>=2)return w[0][0]+w[1][0];if(w.length===1)return w[0].slice(0,2);const d=s.replace(/\D/g,'');return d.slice(-2)||'#';}
 function fmtTime(d){const t=new Date(d);const now=new Date();const sameDay=t.toDateString()===now.toDateString();
   return sameDay? t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : t.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit'})+' '+t.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
 function esc(s){return (s||'').replace(/</g,'&lt;')}
@@ -240,10 +240,10 @@ function esc(s){return (s||'').replace(/</g,'&lt;')}
 const META_PRICE={MARKETING:0.0125,UTILITY:0.0008,AUTHENTICATION:0.0008};
 const PRICE_MARGIN=1.20;
 function tplCost(t){const c=((t&&t.category)||'').toUpperCase();const b=META_PRICE[c];return (b==null)?null:b*PRICE_MARGIN;}
-function fmtCost(v){return v==null?'—':('$'+Number(v).toFixed(4)+' USD');}
+function fmtCost(v){return v==null?'â':('$'+Number(v).toFixed(4)+' USD');}
 
-/* ---- Suscripción del cliente ---- */
-const SUB_START='2026-08-18';   // fecha de inicio de la suscripción
+/* ---- SuscripciÃ³n del cliente ---- */
+const SUB_START='2026-08-18';   // fecha de inicio de la suscripciÃ³n
 const SUB_PLAN='mensual';
 let PAY_LINK='';                 // <-- PEGA AQUI EL LINK DE PAGO CUANDO LO TENGAS (ej: 'https://...')
 function subNextDue(){
@@ -260,23 +260,23 @@ function renderSub(){
   const due=subNextDue(); const days=subDaysLeft(); const warn=days<=3;
   const payBtn=warn?(PAY_LINK?'<a class="sub-pay" href="'+PAY_LINK+'" target="_blank" rel="noopener">Pagar ahora</a>':'<span class="sub-pay off">Falta configurar el link de pago</span>'):'';
   box.className='sub'+(warn?' warn':'');
-  box.innerHTML='<div class="sub-top">💳 Suscripción '+SUB_PLAN+(warn?' <span class="sub-badge">Por vencer</span>':'')+'</div>'+
-    '<div class="sub-sub">Inició 18 ago · Próximo pago: '+fmtDate(due)+'</div>'+
-    '<div class="sub-days">'+(days>0?('Faltan '+days+' día'+(days===1?'':'s')):'Vence hoy')+'</div>'+payBtn;
+  box.innerHTML='<div class="sub-top">ð³ SuscripciÃ³n '+SUB_PLAN+(warn?' <span class="sub-badge">Por vencer</span>':'')+'</div>'+
+    '<div class="sub-sub">IniciÃ³ 18 ago Â· PrÃ³ximo pago: '+fmtDate(due)+'</div>'+
+    '<div class="sub-days">'+(days>0?('Faltan '+days+' dÃ­a'+(days===1?'':'s')):'Vence hoy')+'</div>'+payBtn;
 }
 function subAlertModal(){
   const due=subNextDue(); const days=subDaysLeft();
   document.getElementById('modalRoot').innerHTML='<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="text-align:center">'+
-    '<div style="font-size:40px">⚠️</div>'+
-    '<h2>Tu suscripción está por vencer</h2>'+
-    '<p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Plan '+SUB_PLAN+' · Próximo pago: <b style="color:var(--txt)">'+fmtDate(due)+'</b></p>'+
-    '<p style="color:#fbbf24;font-size:13.5px;font-weight:700;margin-bottom:14px">'+(days>0?('Faltan '+days+' día'+(days===1?'':'s')):'Vence hoy')+'</p>'+
-    (PAY_LINK?'<a class="btn" href="'+PAY_LINK+'" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-bottom:9px">Pagar ahora</a>':'<div class="muted-note" style="margin-bottom:9px">Aún no hay link de pago configurado.</div>')+
+    '<div style="font-size:40px">â ï¸</div>'+
+    '<h2>Tu suscripciÃ³n estÃ¡ por vencer</h2>'+
+    '<p style="color:var(--muted);font-size:13.5px;margin:6px 0 4px">Plan '+SUB_PLAN+' Â· PrÃ³ximo pago: <b style="color:var(--txt)">'+fmtDate(due)+'</b></p>'+
+    '<p style="color:#fbbf24;font-size:13.5px;font-weight:700;margin-bottom:14px">'+(days>0?('Faltan '+days+' dÃ­a'+(days===1?'':'s')):'Vence hoy')+'</p>'+
+    (PAY_LINK?'<a class="btn" href="'+PAY_LINK+'" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-bottom:9px">Pagar ahora</a>':'<div class="muted-note" style="margin-bottom:9px">AÃºn no hay link de pago configurado.</div>')+
     '<button class="btn ghost" onclick="closeModal()">Cerrar</button>'+
    '</div></div>';
 }
 
-const SESSION_MS=24*60*60*1000; // la sesión caduca cada 1 día
+const SESSION_MS=24*60*60*1000; // la sesiÃ³n caduca cada 1 dÃ­a
 let loginTries=parseInt(localStorage.getItem('kv_tries')||'0',10);
 async function login(){
   const btn=document.getElementById('loginBtn');
@@ -287,12 +287,12 @@ async function login(){
   if(btn)btn.disabled=true;
   let r;
   try{ r=await fetch('/api/messages',{headers:hdr()}); }
-  catch(e){ if(errEl)errEl.textContent='Sin conexión. Intenta de nuevo.'; if(btn)btn.disabled=false; return; }
+  catch(e){ if(errEl)errEl.textContent='Sin conexiÃ³n. Intenta de nuevo.'; if(btn)btn.disabled=false; return; }
   if(r.status===401){
     loginTries++; localStorage.setItem('kv_tries',String(loginTries));
     if(loginTries>=5){
       let s=30;
-      const tick=()=>{ if(s<=0){loginTries=0;localStorage.setItem('kv_tries','0');if(errEl)errEl.textContent='';if(btn)btn.disabled=false;} else {if(errEl)errEl.textContent='🔒 Demasiados intentos. Espera '+s+' s por seguridad.';s--;setTimeout(tick,1000);} };
+      const tick=()=>{ if(s<=0){loginTries=0;localStorage.setItem('kv_tries','0');if(errEl)errEl.textContent='';if(btn)btn.disabled=false;} else {if(errEl)errEl.textContent='ð Demasiados intentos. Espera '+s+' s por seguridad.';s--;setTimeout(tick,1000);} };
       tick(); return;
     }
     if(errEl)errEl.textContent='Clave incorrecta. Intento '+loginTries+' de 5.';
@@ -304,7 +304,7 @@ async function login(){
   document.getElementById('app').classList.remove('hidden');
   await load();loadMetaTemplates();loadUsage();renderSub();
   if(subDaysLeft()<=3) subAlertModal();
-  setInterval(load,8000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
+  setInterval(load,5000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
 }
 
 function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
@@ -378,12 +378,12 @@ function renderConvs(){
   let list=Object.values(convs).sort((a,b)=>lastActivity(b)-lastActivity(a));
   if(q) list=list.filter(c=> (nameOf(c.num)+' '+c.num).toLowerCase().includes(q));if(window.__onlyUnread) list=list.filter(isUnread);
   const el=document.getElementById('convs');
-  if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'Aún no hay conversaciones. Cuando alguien escriba al WhatsApp aparecerá aquí, o crea un chat con ✚.')+'</div>';return;}
+  if(!list.length){el.innerHTML='<div class="side-empty">'+(q?'Sin resultados para "'+esc(q)+'".':'AÃºn no hay conversaciones. Cuando alguien escriba al WhatsApp aparecerÃ¡ aquÃ­, o crea un chat con â.')+'</div>';return;}
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
     const unread=isUnread(c);
     const lastTxt=last?(last.body|| (last.type&&last.type!=='text'?('['+last.type+']'):'') ):'';
-    const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+(esc(lastTxt)||'—')) : 'Nuevo chat — escribe el primer mensaje';
+    const prev=last? ((last.direction!=='inbound'?'TÃº: ':'')+(esc(lastTxt)||'â')) : 'Nuevo chat â escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
     return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
       <div class="av">${esc(initials(nameOf(c.num)))}</div>
@@ -393,7 +393,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-function open_(num){current=num;markRead(num);renderConvs();renderThread(num);loadChatBotState(num);document.getElementById('app').classList.add('show-thread');}
+async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{var cid=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])?convs[num].msgs[0].convId:'';var r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?'&c='+encodeURIComponent(cid):''),{headers:{'x-inbox-pass':PASS}});var d=await r.json();if(d&&d.messages&&d.messages.length){convs[num].msgs=d.messages;if(current===num)renderThread(num);}}catch(e){}}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){
@@ -402,10 +402,10 @@ function renderThread(num){
   document.getElementById('thread').classList.remove('hidden');
   document.getElementById('composer').classList.remove('hidden');
   document.getElementById('mainH').innerHTML=
-    `<button class="back" onclick="backToList()" aria-label="Volver">←</button>
+    `<button class="back" onclick="backToList()" aria-label="Volver">â</button>
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
-     <button class="ico" title="Marcar como no leído" onclick="markUnread('${num}')">📩</button><button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
+     <button class="ico" title="Marcar como no leÃ­do" onclick="markUnread('${num}')">ð©</button><button class="ico" title="Editar nombre" onclick="renameContact('${num}')">â</button>`;
   const th=document.getElementById('thread');
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
@@ -414,7 +414,7 @@ function renderThread(num){
       let media='';
       if(m.mediaUrl){
         if(m.type==='image'||(m.mimeType||'').indexOf('image/')===0){media='<img src="'+esc(m.mediaUrl)+'" loading="lazy" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer" onclick="window.open(this.src)"/>';}
-        else{media='<a href="'+esc(m.mediaUrl)+'" target="_blank" rel="noopener" style="color:#22d3ee;text-decoration:underline">📎 '+esc(m.filename||'Ver archivo')+'</a>';}
+        else{media='<a href="'+esc(m.mediaUrl)+'" target="_blank" rel="noopener" style="color:#22d3ee;text-decoration:underline">ð '+esc(m.filename||'Ver archivo')+'</a>';}
       } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
       const bd=esc(m.body);
       const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
@@ -429,12 +429,12 @@ function renderThread(num){
   if(inside){
     comp.classList.remove('locked');
     ta2.disabled=false; if(sb)sb.disabled=false;
-    ta2.placeholder='Escribe una respuesta…';
+    ta2.placeholder='Escribe una respuestaâ¦';
     document.getElementById('winWarn').style.display='none';
   }else{
     comp.classList.add('locked');
     ta2.value=''; ta2.disabled=true; if(sb)sb.disabled=true;
-    ta2.placeholder='🔒 Fuera de la ventana de 24 h — usa 📋 plantillas';
+    ta2.placeholder='ð Fuera de la ventana de 24 h â usa ð plantillas';
     document.getElementById('winWarn').style.display='block';
   }
 }
@@ -449,8 +449,8 @@ async function onFilePicked(inp){
   const f=inp.files && inp.files[0];
   if(!f || !current) return;
   const errEl=document.getElementById('sendErr');
-  if(f.size > 4*1024*1024){ errEl.textContent='El archivo supera 4 MB. Usa uno más liviano.'; return; }
-  errEl.textContent='Subiendo '+f.name+'…';
+  if(f.size > 4*1024*1024){ errEl.textContent='El archivo supera 4 MB. Usa uno mÃ¡s liviano.'; return; }
+  errEl.textContent='Subiendo '+f.name+'â¦';
   const ab=document.getElementById('attBtn'); if(ab)ab.disabled=true;
   try{
     const dataBase64=await new Promise((res,rej)=>{
@@ -461,7 +461,7 @@ async function onFilePicked(inp){
     const up=await fetch('/api/upload',{method:'POST',headers:hdr(),body:JSON.stringify({filename:f.name,contentType:f.type||'application/octet-stream',dataBase64})}).then(r=>r.json());
     if(!up.ok || !up.url){ errEl.textContent='No se pudo subir: '+(up.error||'error'); if(ab)ab.disabled=false; return; }
     const reply=document.getElementById('reply');
-    const caption=(reply.value||'').trim() || ('📎 '+f.name);
+    const caption=(reply.value||'').trim() || ('ð '+f.name);
     const sd=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,mediaUrl:up.url,body:caption})}).then(r=>r.json());
     if(!sd.ok){ errEl.textContent=sd.code===63016?'Fuera de la ventana de 24 h: no se pueden enviar archivos.':('No se pudo enviar: '+(sd.error||'error')); }
     else { errEl.textContent=''; reply.value=''; }
@@ -488,25 +488,25 @@ function openNewChat(){
   document.getElementById('modalRoot').innerHTML=`
    <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
     <h2>Nuevo chat</h2>
-    <label>Número de WhatsApp (con código de país)</label>
+    <label>NÃºmero de WhatsApp (con cÃ³digo de paÃ­s)</label>
     <input id="ncNum" placeholder="+57 300 123 4567" inputmode="tel"/>
     <label>Nombre del contacto (opcional)</label>
-    <input id="ncName" placeholder="Ej: Laura Pérez"/>
+    <input id="ncName" placeholder="Ej: Laura PÃ©rez"/>
     <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" onclick="createChat()">Abrir chat</button></div>
-    <div class="muted-note">Podrás escribir de una vez si el contacto te escribió en las últimas 24 h. Si no, usa 🚀 para iniciar con una plantilla aprobada.</div>
+    <div class="muted-note">PodrÃ¡s escribir de una vez si el contacto te escribiÃ³ en las Ãºltimas 24 h. Si no, usa ð para iniciar con una plantilla aprobada.</div>
    </div></div>`;
   setTimeout(()=>document.getElementById('ncNum').focus(),50);
 }
 function createChat(){
   const num=normNum(document.getElementById('ncNum').value);
   const nm=document.getElementById('ncName').value.trim();
-  if(num.replace('+','').length<8){alert('Número inválido. Incluye el código de país, ej: +57...');return;}
+  if(num.replace('+','').length<8){alert('NÃºmero invÃ¡lido. Incluye el cÃ³digo de paÃ­s, ej: +57...');return;}
   if(!contacts.includes(num)){contacts.push(num);saveContacts();}
   if(nm){names[num]=nm;saveNames();}
   if(!convs[num])convs[num]={num,msgs:[]};
   closeModal();open_(num);
 }
-/* ---- Iniciar conversación con plantilla (fuera de 24 h) ---- */
+/* ---- Iniciar conversaciÃ³n con plantilla (fuera de 24 h) ---- */
 let scVars={};
 function openStartConv(){
   scVars={};
@@ -514,14 +514,14 @@ function openStartConv(){
   const opts=approved.map(t=>`<option value="${metaTemplates.indexOf(t)}">${esc(t.name)}</option>`).join('');
   document.getElementById('modalRoot').innerHTML=`
    <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
-    <h2>Iniciar conversación</h2>
+    <h2>Iniciar conversaciÃ³n</h2>
     <div class="muted-note" style="margin:0 0 8px">Para escribirle a alguien que NO te ha escrito en 24 h, WhatsApp exige una plantilla aprobada por Meta.</div>
-    <label>Número de WhatsApp (con código de país)</label>
+    <label>NÃºmero de WhatsApp (con cÃ³digo de paÃ­s)</label>
     <input id="scNum" placeholder="+57 300 123 4567" inputmode="tel"/>
     <label>Nombre del contacto (opcional)</label>
-    <input id="scName" placeholder="Ej: Laura Pérez"/>
+    <input id="scName" placeholder="Ej: Laura PÃ©rez"/>
     <label>Plantilla aprobada *</label>
-    ${approved.length?`<select id="scTpl" class="mt-sel" onchange="scRenderVars()"><option value="">Selecciona una plantilla…</option>${opts}</select>`:'<div class="muted-note" style="color:#fca5a5">No hay plantillas aprobadas todavía. Crea una en 📋 y espera la aprobación de Meta.</div>'}
+    ${approved.length?`<select id="scTpl" class="mt-sel" onchange="scRenderVars()"><option value="">Selecciona una plantillaâ¦</option>${opts}</select>`:'<div class="muted-note" style="color:#fca5a5">No hay plantillas aprobadas todavÃ­a. Crea una en ð y espera la aprobaciÃ³n de Meta.</div>'}
     <div id="scVarsBox"></div>
     <div id="scPrevBox"></div>
     <div id="scErr" class="send-err"></div>
@@ -545,7 +545,7 @@ function scPrev(){
   if(!t){box.innerHTML='';return;}
   let b=(t.body||''); b=b.replace(/\{\{\s*(\d+)\s*\}\}/g,(m,n)=>scVars[n]||('{{'+n+'}}'));
   const cst=tplCost(t);
-  const cstLine=cst!=null?'<div style="font-size:12.5px;color:#4ade80;margin-top:8px">💵 Costo estimado de este envío: <b>'+fmtCost(cst)+'</b></div>':'';
+  const cstLine=cst!=null?'<div style="font-size:12.5px;color:#4ade80;margin-top:8px">ðµ Costo estimado de este envÃ­o: <b>'+fmtCost(cst)+'</b></div>':'';
   box.innerHTML='<div class="sec-title">Vista previa</div><div class="tpl-item meta ok" style="cursor:default"><div class="tm">'+esc(b)+'</div></div>'+cstLine;
 }
 async function startConv(){
@@ -553,10 +553,10 @@ async function startConv(){
   const nm=document.getElementById('scName').value.trim();
   const t=scCurrentTpl();
   const err=document.getElementById('scErr');
-  if(num.replace('+','').length<8){err.textContent='Número inválido. Incluye el código de país.';return;}
+  if(num.replace('+','').length<8){err.textContent='NÃºmero invÃ¡lido. Incluye el cÃ³digo de paÃ­s.';return;}
   if(!t){err.textContent='Selecciona una plantilla aprobada.';return;}
   const variables={}; for(let i=1;i<=(t.varCount||0);i++){variables[i]=scVars[i]||'';}
-  const btn=document.getElementById('scSend');btn.disabled=true;btn.textContent='Enviando…';
+  const btn=document.getElementById('scSend');btn.disabled=true;btn.textContent='Enviandoâ¦';
   try{
     const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:num,contentSid:t.sid,variables:t.varCount?variables:null})});
     const d=await r.json();
@@ -576,21 +576,21 @@ function renameContact(num){
   saveNames();renderConvs();renderThread(num);
 }
 
-const badgeInfo={approved:['ok','● Aprobada'],pending:['wait','● En revisión'],rejected:['no','● Rechazada']};
+const badgeInfo={approved:['ok','â Aprobada'],pending:['wait','â En revisiÃ³n'],rejected:['no','â Rechazada']};
 function metaPreview(t){
   const nm=current?nameOf(current).split(' ')[0]:'';
   let b=(t.body||'').replace(/\{\{\s*1\s*\}\}/g, nm||'{{1}}');
   return b;
 }
 function renderMetaTemplates(){
-  if(!metaTemplates.length) return '<div class="muted-note">Aún no hay plantillas de Meta. Créalas abajo; se envían a revisión de Meta.</div>';
+  if(!metaTemplates.length) return '<div class="muted-note">AÃºn no hay plantillas de Meta. CrÃ©alas abajo; se envÃ­an a revisiÃ³n de Meta.</div>';
   return metaTemplates.map((t,i)=>{
     const bi=badgeInfo[t.status]||badgeInfo.pending;
     const locked=t.status!=='approved';
     const btns=(t.buttons&&t.buttons.length)?`<div class="btns">${t.buttons.map(b=>'<span>'+esc(b)+'</span>').join('')}</div>`:'';
     const onclick=locked?'':`onclick="sendMetaTemplate(${i})"`;
     const cst=tplCost(t);
-    const cstH=cst!=null?`<div style="font-size:11px;color:#4ade80;margin-top:5px">💵 ${fmtCost(cst)} por envío${(t.category||'').toUpperCase()==='UTILITY'?' · gratis dentro de 24 h':''}</div>`:'';
+    const cstH=cst!=null?`<div style="font-size:11px;color:#4ade80;margin-top:5px">ðµ ${fmtCost(cst)} por envÃ­o${(t.category||'').toUpperCase()==='UTILITY'?' Â· gratis dentro de 24 h':''}</div>`:'';
     return `<div class="tpl-item meta ${bi[0]} ${locked?'locked':''}" ${onclick}>
       <div class="tt">${esc(t.name)}<span class="badge ${bi[0]}">${bi[1]}</span></div>
       <div class="tm">${esc(metaPreview(t))}</div>${btns}${cstH}
@@ -602,17 +602,17 @@ function openTemplates(){
     <div class="tpl-item" onclick="useTemplate(${i})">
       <button class="del" onclick="event.stopPropagation();delTemplate(${i})">Eliminar</button>
       <div class="tt">${esc(t.t)}</div><div class="tm">${esc(t.m)}</div>
-    </div>`).join('') || '<div class="muted-note">No hay plantillas aún.</div>';
+    </div>`).join('') || '<div class="muted-note">No hay plantillas aÃºn.</div>';
   document.getElementById('modalRoot').innerHTML=`
    <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
     <h2>Plantillas</h2>
     <div class="sec-title">Plantillas de Meta (fuera de 24 h)</div>
     ${renderMetaTemplates()}
-    <button class="btn ghost" style="margin-top:6px" onclick="openNewMetaTemplate()">＋ Nueva plantilla de Meta</button>
-    <div class="sec-title">Respuestas rápidas (dentro de 24 h)</div>
+    <button class="btn ghost" style="margin-top:6px" onclick="openNewMetaTemplate()">ï¼ Nueva plantilla de Meta</button>
+    <div class="sec-title">Respuestas rÃ¡pidas (dentro de 24 h)</div>
     ${items}
-    <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">＋ Nueva respuesta rápida</button>
-    <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). El costo mostrado ya incluye el margen. Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
+    <button class="btn ghost" style="margin-top:6px" onclick="addTemplate()">ï¼ Nueva respuesta rÃ¡pida</button>
+    <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (mÃ¡s de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). El costo mostrado ya incluye el margen. Las <b>respuestas rÃ¡pidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
    </div></div>`;
 }
 async function sendMetaTemplate(i){
@@ -621,7 +621,7 @@ async function sendMetaTemplate(i){
   const nm=nameOf(current).split(' ')[0]||'Hola';
   const variables=t.varCount>0?{"1":nm}:null;
   const cst=tplCost(t);
-  if(cst!=null && !confirm('Enviar la plantilla "'+t.name+'".\nCosto estimado: '+fmtCost(cst)+'\n\n¿Continuar?')) return;
+  if(cst!=null && !confirm('Enviar la plantilla "'+t.name+'".\nCosto estimado: '+fmtCost(cst)+'\n\nÂ¿Continuar?')) return;
   closeModal();
   const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,contentSid:t.sid,variables})});
   const d=await r.json();
@@ -635,28 +635,28 @@ function openNewMetaTemplate(){
   document.getElementById('modalRoot').innerHTML=`
    <div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">
     <h2>Nueva plantilla de Meta</h2>
-    <div class="muted-note" style="margin:0 0 8px">Se envía a revisión de Meta al crearla. La aprobación suele tardar de minutos a 24 h.</div>
+    <div class="muted-note" style="margin:0 0 8px">Se envÃ­a a revisiÃ³n de Meta al crearla. La aprobaciÃ³n suele tardar de minutos a 24 h.</div>
     <label>Nombre *</label>
     <input id="tName" placeholder="ej: recordatorio_cita" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'_')"/>
-    <div class="muted-note" style="margin-top:4px">Solo minúsculas, números y guiones bajos.</div>
+    <div class="muted-note" style="margin-top:4px">Solo minÃºsculas, nÃºmeros y guiones bajos.</div>
     <div class="mt-row" style="margin-top:6px">
       <div><label>Idioma</label>
-        <select id="tLang" class="mt-sel"><option value="es">Español</option><option value="es_CO">Español (Colombia)</option><option value="en">Inglés</option></select></div>
-      <div><label>Categoría *</label>
-        <select id="tCat" class="mt-sel"><option value="UTILITY">Utilidad</option><option value="MARKETING">Marketing</option><option value="AUTHENTICATION">Autenticación</option></select></div>
+        <select id="tLang" class="mt-sel"><option value="es">EspaÃ±ol</option><option value="es_CO">EspaÃ±ol (Colombia)</option><option value="en">InglÃ©s</option></select></div>
+      <div><label>CategorÃ­a *</label>
+        <select id="tCat" class="mt-sel"><option value="UTILITY">Utilidad</option><option value="MARKETING">Marketing</option><option value="AUTHENTICATION">AutenticaciÃ³n</option></select></div>
     </div>
     <label>Cuerpo del mensaje * <span id="tBodyCount" style="float:right;color:var(--muted);font-weight:400">0/1024</span></label>
-    <textarea id="tBody" maxlength="1024" style="width:100%;min-height:92px;padding:11px 13px" placeholder="Hola {{1}}, te recordamos tu cita el {{2}}. ¡Te esperamos!" oninput="document.getElementById('tBodyCount').textContent=this.value.length+'/1024';mtPrev()"></textarea>
-    <div class="muted-note" style="margin-top:4px">Usa variables como {{1}}, {{2}}… que se rellenan al enviar.</div>
+    <textarea id="tBody" maxlength="1024" style="width:100%;min-height:92px;padding:11px 13px" placeholder="Hola {{1}}, te recordamos tu cita el {{2}}. Â¡Te esperamos!" oninput="document.getElementById('tBodyCount').textContent=this.value.length+'/1024';mtPrev()"></textarea>
+    <div class="muted-note" style="margin-top:4px">Usa variables como {{1}}, {{2}}â¦ que se rellenan al enviar.</div>
     <label>Encabezado (opcional)</label>
     <input id="tHeader" placeholder="Texto del encabezado" oninput="mtPrev()"/>
-    <label>Pie de página (opcional)</label>
+    <label>Pie de pÃ¡gina (opcional)</label>
     <input id="tFooter" maxlength="60" placeholder="Ej: Consultorio Dra. Tania" oninput="mtPrev()"/>
-    <label>Botones (opcional, máx 3)</label>
+    <label>Botones (opcional, mÃ¡x 3)</label>
     <div id="tBtns"></div>
-    <button class="btn ghost" style="margin-top:6px" onclick="mtAddBtn()">＋ Agregar botón</button>
+    <button class="btn ghost" style="margin-top:6px" onclick="mtAddBtn()">ï¼ Agregar botÃ³n</button>
     <div class="sec-title">Vista previa</div>
-    <div class="tpl-item meta ok" style="cursor:default"><div class="tm" id="tPrev">—</div></div>
+    <div class="tpl-item meta ok" style="cursor:default"><div class="tm" id="tPrev">â</div></div>
     <div id="tErr" class="send-err"></div>
     <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="tCreate" onclick="createMetaTemplate()">Crear y enviar a Meta</button></div>
    </div></div>`;
@@ -667,7 +667,7 @@ function mtPrev(){
   const h=(document.getElementById('tHeader').value||'').trim();
   const b=(document.getElementById('tBody').value||'').trim();
   const f=(document.getElementById('tFooter').value||'').trim();
-  let html=''; if(h)html+='<b>'+esc(h)+'</b>\n'; html+=(esc(b)||'<i>(escribe el cuerpo…)</i>'); if(f)html+='\n<span style="color:#8a98b8;font-size:11px">'+esc(f)+'</span>';
+  let html=''; if(h)html+='<b>'+esc(h)+'</b>\n'; html+=(esc(b)||'<i>(escribe el cuerpoâ¦)</i>'); if(f)html+='\n<span style="color:#8a98b8;font-size:11px">'+esc(f)+'</span>';
   p.innerHTML=html;
 }
 function mtAddBtn(){ if(mtBtns.length>=3)return; mtBtns.push({type:'quick_reply',text:'',url:'',phoneNumber:''}); mtRenderBtns(); }
@@ -676,11 +676,11 @@ function mtRenderBtns(){
   c.innerHTML=mtBtns.map((x,i)=>`
    <div class="mt-btnbox">
      <select class="mt-sel" onchange="mtBtns[${i}].type=this.value;mtRenderBtns()">
-       <option value="quick_reply" ${x.type==='quick_reply'?'selected':''}>Respuesta rápida</option>
+       <option value="quick_reply" ${x.type==='quick_reply'?'selected':''}>Respuesta rÃ¡pida</option>
        <option value="url" ${x.type==='url'?'selected':''}>Abrir enlace (URL)</option>
-       <option value="phone" ${x.type==='phone'?'selected':''}>Llamar (teléfono)</option>
+       <option value="phone" ${x.type==='phone'?'selected':''}>Llamar (telÃ©fono)</option>
      </select>
-     <input placeholder="Texto del botón (máx 25)" maxlength="25" value="${esc(x.text)}" oninput="mtBtns[${i}].text=this.value" style="margin-top:6px"/>
+     <input placeholder="Texto del botÃ³n (mÃ¡x 25)" maxlength="25" value="${esc(x.text)}" oninput="mtBtns[${i}].text=this.value" style="margin-top:6px"/>
      ${x.type==='url'?`<input placeholder="https://..." value="${esc(x.url)}" oninput="mtBtns[${i}].url=this.value" style="margin-top:6px"/>`:''}
      ${x.type==='phone'?`<input placeholder="+57 300 000 0000" value="${esc(x.phoneNumber)}" oninput="mtBtns[${i}].phoneNumber=this.value" style="margin-top:6px"/>`:''}
      <button class="del" onclick="mtBtns.splice(${i},1);mtRenderBtns()">Quitar</button>
@@ -696,14 +696,14 @@ async function createMetaTemplate(){
   const buttons=mtBtns.filter(x=>(x.text||'').trim());
   const err=document.getElementById('tErr');
   if(!name||!body){err.textContent='Completa al menos el nombre y el cuerpo del mensaje.';return;}
-  const btn=document.getElementById('tCreate');btn.disabled=true;btn.textContent='Creando…';
+  const btn=document.getElementById('tCreate');btn.disabled=true;btn.textContent='Creandoâ¦';
   try{
     const r=await fetch('/api/create-template',{method:'POST',headers:hdr(),body:JSON.stringify({name,language,category,body,headerText,footer,buttons})});
     const d=await r.json();
     if(!d.ok){err.textContent='No se pudo crear: '+(d.error||'error');btn.disabled=false;btn.textContent='Crear y enviar a Meta';return;}
     closeModal();
     await loadMetaTemplates();
-    alert(d.submitted?('✅ Plantilla "'+d.name+'" creada y enviada a revisión de Meta.'):('✅ Plantilla "'+d.name+'" creada como borrador.'+(d.submitError?('\n\nNota: '+d.submitError):'')));
+    alert(d.submitted?('â Plantilla "'+d.name+'" creada y enviada a revisiÃ³n de Meta.'):('â Plantilla "'+d.name+'" creada como borrador.'+(d.submitError?('\n\nNota: '+d.submitError):'')));
     openTemplates();
   }catch(e){err.textContent='Error: '+e;btn.disabled=false;btn.textContent='Crear y enviar a Meta';}
 }
@@ -716,11 +716,11 @@ function useTemplate(i){
   closeModal();ta.focus();
 }
 function addTemplate(){
-  const t=prompt('Título de la plantilla:');if(!t)return;
+  const t=prompt('TÃ­tulo de la plantilla:');if(!t)return;
   const m=prompt('Mensaje (puedes usar {nombre}):');if(!m)return;
   templates.push({t:t.trim(),m:m.trim()});saveTpl();openTemplates();
 }
-function delTemplate(i){if(confirm('¿Eliminar esta plantilla?')){templates.splice(i,1);saveTpl();openTemplates();}}
+function delTemplate(i){if(confirm('Â¿Eliminar esta plantilla?')){templates.splice(i,1);saveTpl();openTemplates();}}
 
 function logout(){localStorage.removeItem('kv_pass');localStorage.removeItem('kv_login_ts');location.reload();}
 (function(){
