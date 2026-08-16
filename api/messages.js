@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
 
   const MAX_CONV_PAGES = 20;  // hasta 20 x 50 = 1000 conversaciones
   const MAX_CONVS = 300;      // tope de conversaciones a procesar
-  const CONCURRENCY = 4;      // fetches de mensajes en paralelo (suave)
+  const CONCURRENCY = 15      // fetches de mensajes en paralelo (suave)
 
   try {
     // 1) Traer TODAS las conversaciones (paginando por cursor).
