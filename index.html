@@ -388,7 +388,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-function open_(num){current=num;markRead(num);renderConvs();renderThread(num);loadChatBotState(num);document.getElementById('app').classList.add('show-thread');}
+async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length&&convs[num]){convs[num].msgs=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){
