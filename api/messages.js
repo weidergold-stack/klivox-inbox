@@ -1,5 +1,5 @@
 // api/messages.js — historial COMPLETO para la bandeja (desde Zavu).
-// Trae TODAS las conversaciones (paginando por cursor) y sus mensajes en paralelo.
+// Trae TODAS las conversaciones (paginando por cursor) y sus mensajes en paralelo suave.
 // La direccion se determina por el contacto del hilo (contactIdentifier).
 // Devuelve: { messages:[{direction,from,to,body,type,mediaUrl,filename,mimeType,date}] }
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), INBOX_PASSWORD, INBOX_SINCE (opcional)
@@ -13,12 +13,11 @@ module.exports = async (req, res) => {
   const H = { Authorization: 'Bearer ' + KEY };
   if (SENDER) H['Zavu-Sender'] = SENDER;
   const norm = (s) => (s || '').replace(/\D/g, '');
-  // Punto de reinicio (go-live). Por defecto muestra TODO el historial.
   const SINCE = process.env.INBOX_SINCE ? Date.parse(process.env.INBOX_SINCE) : Date.parse('2020-01-01T00:00:00Z');
 
   const MAX_CONV_PAGES = 20;  // hasta 20 x 50 = 1000 conversaciones
   const MAX_CONVS = 300;      // tope de conversaciones a procesar
-  const CONCURRENCY = 10;     // fetches de mensajes en paralelo
+  const CONCURRENCY = 4;      // fetches de mensajes en paralelo (suave)
 
   try {
     // 1) Traer TODAS las conversaciones (paginando por cursor).
@@ -37,13 +36,13 @@ module.exports = async (req, res) => {
     } while (cursor && pages < MAX_CONV_PAGES && convs.length < MAX_CONVS);
     convs = convs.slice(0, MAX_CONVS);
 
-    // 2) Mensajes de cada conversacion en paralelo (por lotes) para no demorar.
+    // 2) Mensajes de cada conversacion (en lotes) para traer todo sin demorar de mas.
     const fetchConv = async (c) => {
       const contact = c.contactIdentifier || '';
       const cdig = norm(contact);
       let items = [];
       try {
-        const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(c.id) + '/messages?limit=200', { headers: H });
+        const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(c.id) + '/messages?limit=100', { headers: H });
         const md = await mr.json().catch(() => ({}));
         items = (md && md.items) || [];
       } catch (_) { items = []; }
