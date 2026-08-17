@@ -61,6 +61,23 @@ module.exports = async (req, res) => {
   } catch (_) {}
 
   const round = (n) => Math.round(n * 10000) / 10000;
+  try {
+    const _ns = process.env.INBOX_NS || 'default';
+    const _mk = now.getUTCFullYear() + '-' + (now.getUTCMonth() + 1);
+    const _kk = 'usage:' + _ns + ':' + _mk;
+    const _ku = process.env.KV_REST_API_URL, _kt = process.env.KV_REST_API_TOKEN;
+    if (_ku && _kt) {
+      let _prev = null;
+      try { const _gr = await fetch(_ku + '/get/' + _kk, { headers: { Authorization: 'Bearer ' + _kt } }); const _gd = await _gr.json(); if (_gd && _gd.result) _prev = JSON.parse(_gd.result); } catch (e) {}
+      if (_prev && typeof _prev.count === 'number' && _prev.count > count) {
+        count = _prev.count;
+        if (typeof _prev.spentMeta === 'number' && _prev.spentMeta > spentMeta) spentMeta = _prev.spentMeta;
+        if (typeof _prev.spentTotal === 'number' && _prev.spentTotal > spentTotal) spentTotal = _prev.spentTotal;
+      } else {
+        try { await fetch(_ku + '/set/' + _kk, { method: 'POST', headers: { Authorization: 'Bearer ' + _kt, 'Content-Type': 'text/plain' }, body: JSON.stringify({ count: count, spentMeta: spentMeta, spentTotal: spentTotal }) }); } catch (e) {}
+      }
+    }
+  } catch (e) {}
   res.status(200).json({
     count,
     limit: LIMIT_ESENCIAL,
