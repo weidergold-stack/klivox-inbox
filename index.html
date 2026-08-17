@@ -364,7 +364,7 @@ async function load(){
       convs[other].msgs.push(m);
     }
     for(const num of contacts){ if(!convs[num]) convs[num]={num,msgs:[]}; }
-    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));
+    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){if(convs[_k]){var _c=window.__tc[_k];var _cl=_c[_c.length-1];var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}}
     if(current&&convs[current])markRead(current);
     renderConvs();
     if(current&&convs[current])renderThread(current);
@@ -394,7 +394,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length&&convs[num]){convs[num].msgs=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
+async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length&&convs[num]){convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){
