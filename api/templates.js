@@ -30,7 +30,24 @@ module.exports = async (req, res) => {
         buttons
       };
     });
-    res.status(200).json({ templates });
+    for (const _tpl of templates) {
+    if (!_tpl.body || !String(_tpl.body).trim()) {
+      try {
+        const _dr = await fetch('https://api.zavu.dev/v1/templates/' + encodeURIComponent(_tpl.sid), { headers });
+        if (_dr.ok) {
+          const _dd = await _dr.json();
+          if (_dd && typeof _dd.body === 'string' && _dd.body.trim()) {
+            _tpl.body = _dd.body;
+            const _m = _dd.body.match(/\{\{[^}]+\}\}/g) || [];
+            const _u = [];
+            _m.forEach(function(x){ var k = x.replace(/[{}]/g,'').trim(); if (_u.indexOf(k) === -1) _u.push(k); });
+            if (_u.length) _tpl.varCount = _u.length;
+          }
+        }
+      } catch (_e) {}
+    }
+  }
+  res.status(200).json({ templates });
   } catch (e) {
     res.status(200).json({ templates: [], error: String(e) });
   }
