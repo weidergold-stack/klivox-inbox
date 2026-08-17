@@ -34,17 +34,21 @@ module.exports = async (req, res) => {
     if (!_tpl.body || !String(_tpl.body).trim()) {
       try {
         const _dr = await fetch('https://api.zavu.dev/v1/templates/' + encodeURIComponent(_tpl.sid), { headers });
-        const _dd = await _dr.json().catch(function(){ return null; });
-        const _t = (_dd && (_dd.template || _dd.data)) || _dd || {};
-        var _b = (typeof _t.body === 'string' && _t.body) || (_t.whatsapp && typeof _t.whatsapp.body === 'string' && _t.whatsapp.body) || '';
-        if (_b && _b.trim()) {
-          _tpl.body = _b;
-          const _m = _b.match(/\{\{[^}]+\}\}/g) || [];
-          const _u = [];
-          _m.forEach(function(x){ var k = x.replace(/[{}]/g,'').trim(); if (_u.indexOf(k) === -1) _u.push(k); });
-          if (_u.length) _tpl.varCount = _u.length;
+        if (_dr.ok) {
+          const _dd = await _dr.json().catch(function(){ return null; });
+          const _t = (_dd && (_dd.template || _dd.data)) || _dd || {};
+          const _wa = _t.whatsapp || {};
+          const _cands = [_t.body, _t.whatsappBody, _wa.body, _wa.text, _wa.content];
+          let _b = '';
+          for (let _ci = 0; _ci < _cands.length; _ci++) { if (typeof _cands[_ci] === 'string' && _cands[_ci].trim()) { _b = _cands[_ci]; break; } }
+          if (_b) {
+            _tpl.body = _b;
+            const _m = _b.match(/\{\{[^}]+\}\}/g) || [];
+            const _u = [];
+            _m.forEach(function(x){ var k = x.replace(/[{}]/g,'').trim(); if (_u.indexOf(k) === -1) _u.push(k); });
+            if (_u.length) _tpl.varCount = _u.length;
+          }
         }
-        _tpl._dbg = { status: _dr.status, keys: _t && typeof _t === 'object' ? Object.keys(_t).slice(0,20) : String(_t), bodyType: typeof _t.body, bodyLen: (typeof _t.body==='string'?_t.body.length:-1) };
       } catch (_e) {}
     }
   }
