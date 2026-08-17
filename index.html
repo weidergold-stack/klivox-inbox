@@ -744,7 +744,7 @@ window.DOC_COLOR={'Dr Weider':'#2e7d32','Dra Fernanda':'#1565c0','Dra Daniela':'
 window.labels=window.labels||{};
 window.__lblFA=''; window.__lblFD='';
 async function loadLabels(){ try{ const r=await fetch('/api/labels',{headers:hdr()}); const dd=await r.json(); if(dd&&dd.labels) window.labels=dd.labels; }catch(e){} try{injectLabels();}catch(e){} }
-async function saveLabels(){ try{ await fetch('/api/labels',{method:'POST',headers:hdr(),body:JSON.stringify({labels:window.labels})}); }catch(e){} }
+function saveLabels(){ window.__saveChain=(window.__saveChain||Promise.resolve()).then(function(){ return fetch('/api/labels',{method:'POST',headers:hdr(),body:JSON.stringify({labels:window.labels})}).catch(function(){}); }); return window.__saveChain; }
 function lblOf(n){ return window.labels[n]||{}; }
 function setLabel(n,t,v){ var c=window.labels[n]||{}; if(v)c[t]=v; else delete c[t]; if(!c.a&&!c.d)delete window.labels[n]; else window.labels[n]=c; saveLabels(); injectLabels(); }
 function lblPass(n){ var l=lblOf(n); if(window.__lblFA&&l.a!==window.__lblFA)return false; if(window.__lblFD&&l.d!==window.__lblFD)return false; return true; }
