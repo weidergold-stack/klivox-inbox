@@ -616,16 +616,17 @@ function openTemplates(){
     <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). El costo mostrado ya incluye el margen. Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
    </div></div>`;
 }
-function tvVals(t){var v={};var n=t.varCount||0;for(var k=1;k<=n;k++){var el=document.getElementById('tvv'+k);v[String(k)]=el?el.value:'';}return v;}
-function tvPrev(i){var t=metaTemplates[i];if(!t)return;var b=t.body||'';var v=tvVals(t);b=b.replace(/\{\{(\d+)\}\}/g,function(m,d){return (v[d]&&v[d].length)?v[d]:('{{'+d+'}}');});var el=document.getElementById('tvPv');if(el)el.textContent=b;}
+function tvKeys(t){var b=(t&&t.body)||'';var seen=[];var re=/\{\{([^}]+)\}\}/g;var m;while((m=re.exec(b))){var k=m[1].trim();if(seen.indexOf(k)===-1)seen.push(k);}return seen;}
+function tvVals(t){var v={};tvKeys(t).forEach(function(k){var el=document.getElementById('tvv_'+k);v[k]=el?el.value:'';});return v;}
+function tvPrev(i){var t=metaTemplates[i];if(!t)return;var v=tvVals(t);var b=(t.body||'').replace(/\{\{([^}]+)\}\}/g,function(m,d){var k=d.trim();return (v[k]&&v[k].length)?v[k]:('{{'+k+'}}');});var el=document.getElementById('tvPv');if(el)el.textContent=b;}
 function tvClose(){var o=document.getElementById('tvOv');if(o)o.remove();}
 function tvSend(i){var t=metaTemplates[i];var v=tvVals(t);for(var k in v){if(!String(v[k]).trim()){alert('Completa todas las variables antes de enviar.');return;}}window.__tplVars=v;tvClose();sendMetaTemplate(i);}
-function openTplVars(i){var t=metaTemplates[i];if(!t)return;var n=t.varCount||0;var raw=((typeof nameOf==='function'?nameOf(current):'')||'').trim();var nm=/^[+\d]/.test(raw)?'':(raw.split(' ')[0]||'');var box='';for(var k=1;k<=n;k++){var dv=(k===1?nm:'');box+='<label class="tvL">Variable {{'+k+'}}</label><input class="tvIn" id="tvv'+k+'" value="'+String(dv).replace(/"/g,'&quot;')+'" oninput="tvPrev('+i+')" placeholder="Escribe el valor...">';}var ov=document.createElement('div');ov.className='tvOv';ov.id='tvOv';ov.onclick=function(e){if(e.target===ov)tvClose();};ov.innerHTML='<div class="tvBox"><div class="tvH">Completa la plantilla</div><div class="tvSub">'+t.name+'</div>'+box+'<div class="tvPvL">Vista previa</div><div class="tvPv" id="tvPv"></div><div class="tvBtns"><button class="tvBc" onclick="tvClose()">Cancelar</button><button class="tvBs" onclick="tvSend('+i+')">Enviar</button></div></div>';document.body.appendChild(ov);tvPrev(i);var f=document.getElementById('tvv'+(n>1?2:1));if(f)f.focus();}
+function openTplVars(i){var t=metaTemplates[i];if(!t)return;var keys=tvKeys(t);if(!keys.length){window.__tplVars={};sendMetaTemplate(i);return;}var raw=((typeof nameOf==='function'?nameOf(current):'')||'').trim();var nm=/^[+\d]/.test(raw)?'':(raw.split(' ')[0]||'');var box='';keys.forEach(function(k){var isName=(k==='1'||/name|nombre/i.test(k));var dv=isName?nm:'';var lbl=/^\d+$/.test(k)?('Variable {{'+k+'}}'):k;box+='<label class="tvL">'+lbl+'</label><input class="tvIn" id="tvv_'+k+'" value="'+String(dv).replace(/"/g,'&quot;')+'" oninput="tvPrev('+i+')" placeholder="Escribe el valor...">';});var ov=document.createElement('div');ov.className='tvOv';ov.id='tvOv';ov.onclick=function(e){if(e.target===ov)tvClose();};ov.innerHTML='<div class="tvBox"><div class="tvH">Completa la plantilla</div><div class="tvSub">'+t.name+'</div>'+box+'<div class="tvPvL">Vista previa</div><div class="tvPv" id="tvPv"></div><div class="tvBtns"><button class="tvBc" onclick="tvClose()">Cancelar</button><button class="tvBs" onclick="tvSend('+i+')">Enviar</button></div></div>';document.body.appendChild(ov);tvPrev(i);}
 async function sendMetaTemplate(i){
   const t=metaTemplates[i];if(!t||t.status!=='approved')return;
   if(!current){alert('Abre o crea un chat primero.');return;}
   const nm=nameOf(current).split(' ')[0]||'Hola';
-  var variables=window.__tplVars||null;window.__tplVars=null;if(!variables&&t.varCount>0){openTplVars(i);return;}
+  var variables=window.__tplVars||null;window.__tplVars=null;if(!variables){openTplVars(i);return;}
   const cst=tplCost(t);
   if(cst!=null && !confirm('Enviar la plantilla "'+t.name+'".\nCosto estimado: '+fmtCost(cst)+'\n\n¿Continuar?')) return;
   closeModal();
