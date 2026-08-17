@@ -136,7 +136,7 @@
   #emojiPanel .emo{background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:5px 6px;border-radius:8px}
   #emojiPanel .emo:hover{background:var(--hover)}
   .composer{position:relative}
-.fltwrap{display:flex;gap:6px;padding:2px 12px 8px}.flt{flex:1;border:1px solid var(--line2);background:#fff;color:var(--muted);border-radius:16px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}.flt.active{background:var(--greenL);color:var(--txt);border-color:var(--green)}</style>
+.fltwrap{display:flex;gap:6px;padding:2px 12px 8px}.flt{flex:1;border:1px solid var(--line2);background:#fff;color:var(--muted);border-radius:16px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}.flt.active{background:var(--greenL);color:var(--txt);border-color:var(--green)}.tvOv{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999}.tvBox{background:#fff;border-radius:16px;padding:18px 18px 16px;width:90%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:88vh;overflow:auto}.tvH{font-weight:700;font-size:16px;margin-bottom:2px;color:#111}.tvSub{font-size:12px;color:#888;margin-bottom:12px}.tvL{display:block;font-size:12px;color:#555;margin:8px 0 3px}.tvIn{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #ddd;border-radius:9px;font-size:14px;outline:none}.tvIn:focus{border-color:#25d366}.tvPvL{font-size:12px;color:#555;margin:12px 0 4px}.tvPv{background:#e8f6ee;border-radius:10px;padding:10px 12px;font-size:13px;white-space:pre-wrap;color:#111;min-height:20px}.tvBtns{display:flex;gap:8px;margin-top:14px}.tvBc{flex:1;padding:10px;border:1px solid #ddd;background:#fff;border-radius:10px;font-size:14px;cursor:pointer}.tvBs{flex:1;padding:10px;border:0;background:#25d366;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}</style>
   
 </head>
 <body>
@@ -615,11 +615,16 @@ function openTemplates(){
     <div class="muted-note">Las <b>plantillas de Meta</b> reabren conversaciones cerradas (más de 24 h). Solo puedes enviar las <b style="color:#4ade80">verdes</b> (aprobadas). El costo mostrado ya incluye el margen. Las <b>respuestas rápidas</b> se insertan en el cuadro de texto y solo funcionan dentro de la ventana de 24 h.</div>
    </div></div>`;
 }
+function tvVals(t){var v={};var n=t.varCount||0;for(var k=1;k<=n;k++){var el=document.getElementById('tvv'+k);v[String(k)]=el?el.value:'';}return v;}
+function tvPrev(i){var t=metaTemplates[i];if(!t)return;var b=t.body||'';var v=tvVals(t);b=b.replace(/\{\{(\d+)\}\}/g,function(m,d){return (v[d]&&v[d].length)?v[d]:('{{'+d+'}}');});var el=document.getElementById('tvPv');if(el)el.textContent=b;}
+function tvClose(){var o=document.getElementById('tvOv');if(o)o.remove();}
+function tvSend(i){var t=metaTemplates[i];var v=tvVals(t);for(var k in v){if(!String(v[k]).trim()){alert('Completa todas las variables antes de enviar.');return;}}window.__tplVars=v;tvClose();sendMetaTemplate(i);}
+function openTplVars(i){var t=metaTemplates[i];if(!t)return;var n=t.varCount||0;var raw=((typeof nameOf==='function'?nameOf(current):'')||'').trim();var nm=/^[+\d]/.test(raw)?'':(raw.split(' ')[0]||'');var box='';for(var k=1;k<=n;k++){var dv=(k===1?nm:'');box+='<label class="tvL">Variable {{'+k+'}}</label><input class="tvIn" id="tvv'+k+'" value="'+String(dv).replace(/"/g,'&quot;')+'" oninput="tvPrev('+i+')" placeholder="Escribe el valor...">';}var ov=document.createElement('div');ov.className='tvOv';ov.id='tvOv';ov.onclick=function(e){if(e.target===ov)tvClose();};ov.innerHTML='<div class="tvBox"><div class="tvH">Completa la plantilla</div><div class="tvSub">'+t.name+'</div>'+box+'<div class="tvPvL">Vista previa</div><div class="tvPv" id="tvPv"></div><div class="tvBtns"><button class="tvBc" onclick="tvClose()">Cancelar</button><button class="tvBs" onclick="tvSend('+i+')">Enviar</button></div></div>';document.body.appendChild(ov);tvPrev(i);var f=document.getElementById('tvv'+(n>1?2:1));if(f)f.focus();}
 async function sendMetaTemplate(i){
   const t=metaTemplates[i];if(!t||t.status!=='approved')return;
   if(!current){alert('Abre o crea un chat primero.');return;}
   const nm=nameOf(current).split(' ')[0]||'Hola';
-  const variables=t.varCount>0?{"1":nm}:null;
+  var variables=window.__tplVars||null;window.__tplVars=null;if(!variables&&t.varCount>0){openTplVars(i);return;}
   const cst=tplCost(t);
   if(cst!=null && !confirm('Enviar la plantilla "'+t.name+'".\nCosto estimado: '+fmtCost(cst)+'\n\n¿Continuar?')) return;
   closeModal();
