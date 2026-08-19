@@ -225,7 +225,8 @@ if(!templates){templates=[
   {t:'Gracias',m:'¡Gracias por escribirnos! Cualquier cosa, aquí estamos. 😊'}
 ];saveTpl();}
 
-function saveNames(){localStorage.setItem('kv_names',JSON.stringify(names));try{fetch('/api/names',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({names:names})});}catch(_){}}
+function saveNames(chg){localStorage.setItem('kv_names',JSON.stringify(names));var payload=chg?{set:chg}:{names:names};window.__nSave=(window.__nSave||Promise.resolve()).then(function(){return fetch('/api/names',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify(payload)}).catch(function(){});});return window.__nSave;}
+async function refreshNames(){try{if(window.__nSave)await window.__nSave;var r=await fetch('/api/names',{headers:hdr()});var d=await r.json();if(d&&d.names){var srv=d.names,chg=false;for(var k in srv){if(names[k]!==srv[k]){names[k]=srv[k];chg=true;}}if(chg){localStorage.setItem('kv_names',JSON.stringify(names));renderConvs();if(typeof current!=='undefined'&&current)renderThread(current);}}}catch(e){}}
 async function loadNames(){try{const r=await fetch('/api/names',{headers:hdr()});if(r.ok){const d=await r.json();if(d&&d.names){names=Object.assign({},names,d.names);localStorage.setItem('kv_names',JSON.stringify(names));if(typeof renderConvs==='function')renderConvs();}}}catch(_){}}
 function saveContacts(){localStorage.setItem('kv_contacts',JSON.stringify(contacts));}
 function saveTpl(){localStorage.setItem('kv_templates',JSON.stringify(templates));}
@@ -356,7 +357,7 @@ async function load(){
     const r=await fetch('/api/messages',{headers:hdr()});
     if(r.status===401){logout();return;}
     const d=await r.json();
-    messages=((d.messages||[]).length>=(messages||[]).length*0.8)?(d.messages||[]):(messages||[]);if(!window.__nl){window.__nl=1;loadNames();}
+    messages=((d.messages||[]).length>=(messages||[]).length*0.8)?(d.messages||[]):(messages||[]);if(!window.__nl){window.__nl=1;loadNames();}else{refreshNames();}
     convs={};
     for(const m of messages){
       const other=(m.direction==='inbound')?fmtNum(m.from):fmtNum(m.to);
@@ -503,7 +504,7 @@ function createChat(){
   const nm=document.getElementById('ncName').value.trim();
   if(num.replace('+','').length<8){alert('Número inválido. Incluye el código de país, ej: +57...');return;}
   if(!contacts.includes(num)){contacts.push(num);saveContacts();}
-  if(nm){names[num]=nm;saveNames();}
+  if(nm){names[num]=nm;var _c3={};_c3[num]=nm;saveNames(_c3);}
   if(!convs[num])convs[num]={num,msgs:[]};
   closeModal();open_(num);
 }
@@ -563,7 +564,7 @@ async function startConv(){
     const d=await r.json();
     if(!d.ok){err.textContent='No se pudo enviar: '+(d.error||'error');btn.disabled=false;btn.textContent='Enviar e iniciar chat';return;}
     if(!contacts.includes(num)){contacts.push(num);saveContacts();}
-    if(nm){names[num]=nm;saveNames();}
+    if(nm){names[num]=nm;var _c3={};_c3[num]=nm;saveNames(_c3);}
     closeModal();
     await load();loadUsage();
     open_(num);
@@ -574,7 +575,7 @@ function renameContact(num){
   const nm=prompt('Nombre para '+num+':',cur);
   if(nm===null)return;
   if(nm.trim()){names[num]=nm.trim();}else{delete names[num];}
-  saveNames();renderConvs();renderThread(num);
+  var _chg={};_chg[num]=nm.trim()?nm.trim():'';saveNames(_chg);renderConvs();renderThread(num);
 }
 
 const badgeInfo={approved:['ok','● Aprobada'],pending:['wait','● En revisión'],rejected:['no','● Rechazada']};
