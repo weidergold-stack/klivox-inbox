@@ -17,7 +17,21 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       let body = req.body;
       if (typeof body === 'string') { try { body = JSON.parse(body); } catch (_) { body = {}; } }
-      const names = (body && body.names) || {};
+      let names = (body && body.names) || {};
+      if (body && body.set && typeof body.set === 'object') {
+        let current = {};
+        try {
+          const gr = await fetch(URL + '/get/' + encodeURIComponent(KEY), { headers: AUTH });
+          const gd = await gr.json();
+          if (gd && gd.result) current = JSON.parse(gd.result) || {};
+        } catch (e) {}
+        for (const k in body.set) {
+          const v = body.set[k];
+          if (v === null || v === '') delete current[k];
+          else current[k] = v;
+        }
+        names = current;
+      }
       const r = await fetch(URL + '/set/' + encodeURIComponent(KEY), {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'text/plain' }, AUTH),
