@@ -113,9 +113,9 @@ module.exports = async (req, res) => {
     const myNum = (data.to || '').replace(/\D/g, ''); // NUESTRO numero (el sender)
     if (!from || !body) return done(); // por ahora solo texto
 
-    // Interruptor de pausa: global o por conversación (Redis) — claves aisladas de Tania
-    if ((await kvGet('tania_bot_paused')) === '1') return done();
-    if ((await kvGet('tania_paused:' + from)) === '1') return done();
+    // Interruptor de pausa: global o por conversación (Redis), aislado por bandeja (INBOX_NS)
+    if ((await kvGet('botpaused:' + NS)) === '1') return done();
+    if ((await kvGet('paused:' + NS + ':' + from)) === '1') return done();
 
     const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER, AKEY = process.env.ANTHROPIC_API_KEY;
     if (!KEY) return done();
@@ -157,7 +157,7 @@ module.exports = async (req, res) => {
       const kws = String(cfg.escalate.keywords || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
       const low = body.toLowerCase();
       if (kws.some(k => low.indexOf(k) !== -1)) {
-        await kvSet('tania_paused:' + from, '1');
+        await kvSet('paused:' + NS + ':' + from, '1');
         await kvSet('escalated:' + NS + ':' + dig, String(Date.now()));
         await sendText(cfg.escalate.msg);
         return done();
