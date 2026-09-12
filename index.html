@@ -755,12 +755,12 @@ function tlSave(){
   window.__tlChain=(window.__tlChain||Promise.resolve()).then(async function(){
     try{var r=await fetch('/api/labels',{headers:hdr()});var d=await r.json();var S=(d&&d.labels)||{};
       var sa=(S.assign&&typeof S.assign==='object')?S.assign:{};
-      TL.assign=Object.assign({},sa,TL.assign);}catch(e){}
+      var mg=Object.assign({},sa);var tch=window.__tlTouched||{};Object.keys(tch).forEach(function(k){if(TL.assign[k]&&TL.assign[k].length)mg[k]=TL.assign[k];else delete mg[k];});TL.assign=mg;}catch(e){}
     return fetch('/api/labels',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({labels:{defs:TL.defs,assign:TL.assign}})}).catch(function(){});
   });
   return window.__tlChain;
 }
-function tlToggle(n,id){var a=tlOf(n).slice();var i=a.indexOf(id);if(i===-1)a.push(id);else a.splice(i,1);if(a.length)TL.assign[n]=a;else delete TL.assign[n];tlSave();tlInject();}
+function tlToggle(n,id){window.__tlTouched=window.__tlTouched||{};window.__tlTouched[n]=1;var a=tlOf(n).slice();var i=a.indexOf(id);if(i===-1)a.push(id);else a.splice(i,1);if(a.length)TL.assign[n]=a;else delete TL.assign[n];tlSave();tlInject();}
 function tlPass(n){if(!window.__tlFilter)return true;return tlOf(n).indexOf(window.__tlFilter)!==-1;}
 function tlClose(){document.querySelectorAll('.tlpop,.tlmod').forEach(function(p){p.remove();});}
 function tlInject(){
