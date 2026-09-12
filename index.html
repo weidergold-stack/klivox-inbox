@@ -368,7 +368,7 @@ async function load(){
     Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){if(convs[_k]){var _c=window.__tc[_k];var _cl=_c[_c.length-1];var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}}
     if(current&&convs[current])markRead(current);
     renderConvs();
-    if(current&&convs[current])renderThread(current);
+    if(current&&convs[current]){var _ms=convs[current].msgs||[];var _sig=_ms.length+'|'+((_ms[_ms.length-1]||{}).date||'')+'|'+((_ms[_ms.length-1]||{}).body||'').length;if(_sig!==window.__thSig){window.__thSig=_sig;renderThread(current);}}
   }catch(e){}
 }
 
@@ -398,7 +398,7 @@ function renderConvs(){
 async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length&&convs[num]){convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
-function renderThread(num){
+function renderThread(num){var _th0=document.getElementById('thread');var _atBot=(!_th0)||((_th0.scrollHeight-_th0.scrollTop-_th0.clientHeight)<90);var _chgConv=(window.__thLast!==num);var _ta0=document.getElementById('reply');var _keep=_ta0?_ta0.value:'';var _ss=_ta0?_ta0.selectionStart:0;var _se=_ta0?_ta0.selectionEnd:0;var _hadFocus=(_ta0&&document.activeElement===_ta0);window.__thLast=num;
   const c=convs[num];if(!c)return;
   document.getElementById('empty').classList.add('hidden');
   document.getElementById('thread').classList.remove('hidden');
@@ -422,7 +422,7 @@ function renderThread(num){
       const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
       return `<div class="bub ${cls}">${inner}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
   }
-  th.scrollTop=th.scrollHeight;
+  if(_atBot||_chgConv){th.scrollTop=th.scrollHeight;}
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
   const comp=document.getElementById('composer');
   const ta2=document.getElementById('reply');
@@ -435,7 +435,7 @@ function renderThread(num){
     document.getElementById('winWarn').style.display='none';
   }else{
     comp.classList.add('locked');
-    ta2.value=''; ta2.disabled=true; if(sb)sb.disabled=true;
+    if(!_keep||_chgConv)ta2.value=''; ta2.disabled=true; if(sb)sb.disabled=true;
     ta2.placeholder='🔒 Fuera de la ventana de 24 h — usa 📋 plantillas';
     document.getElementById('winWarn').style.display='block';
   }
@@ -758,6 +758,8 @@ if(typeof renderConvs==='function'&&!window.__lblWrapped){ window.__lblWrapped=t
 try{ buildLblFilterBar(); }catch(e){}
 loadLabels();
 
+
+(function(){if(window.__rtWrapped)return;window.__rtWrapped=true;var _o=renderThread;renderThread=function(num){var ta=document.getElementById('reply');var keep=ta?ta.value:'';var ss=ta?ta.selectionStart:0;var se=ta?ta.selectionEnd:0;var had=(ta&&document.activeElement===ta);var same=(window.__thLast===num);var r=_o.apply(this,arguments);try{var t2=document.getElementById('reply');if(t2&&same&&keep&&t2.value!==keep){t2.value=keep;try{t2.setSelectionRange(ss,se);}catch(e){}}if(had&&t2&&document.activeElement!==t2){try{t2.focus();}catch(e){}}}catch(e){}return r;};})();
 </script>
 </body>
 </html>
