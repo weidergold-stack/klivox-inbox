@@ -759,7 +759,7 @@ try{ buildLblFilterBar(); }catch(e){}
 loadLabels();
 
 
-(function(){if(window.__rtWrapped)return;window.__rtWrapped=true;var _o=renderThread;renderThread=function(num){var ta=document.getElementById('reply');var keep=ta?ta.value:'';var ss=ta?ta.selectionStart:0;var se=ta?ta.selectionEnd:0;var had=(ta&&document.activeElement===ta);var same=(window.__thLast===num);var r=_o.apply(this,arguments);try{var t2=document.getElementById('reply');if(t2&&same&&keep&&t2.value!==keep){t2.value=keep;try{t2.setSelectionRange(ss,se);}catch(e){}}if(had&&t2&&document.activeElement!==t2){try{t2.focus();}catch(e){}}}catch(e){}return r;};})();
+(function(){if(window.__rtWrapped)return;window.__rtWrapped=true;window.__drafts={};var _o=renderThread;renderThread=function(num){var ta=document.getElementById('reply');var keep=ta?ta.value:'';var ss=ta?ta.selectionStart:0;var se=ta?ta.selectionEnd:0;var had=(ta&&document.activeElement===ta);var prev=window.__thLast;var same=(prev===num);if(!same&&prev!==undefined&&ta){window.__drafts[prev]=keep;}var r=_o.apply(this,arguments);try{var t2=document.getElementById('reply');if(t2){if(same){if(keep&&t2.value!==keep){t2.value=keep;try{t2.setSelectionRange(ss,se);}catch(e){}}}else{t2.value=window.__drafts[num]||'';}if(had&&document.activeElement!==t2){try{t2.focus();}catch(e){}}}}catch(e){}return r;};})();
 </script>
 </body>
 </html>
