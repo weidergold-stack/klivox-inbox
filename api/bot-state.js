@@ -11,6 +11,44 @@ module.exports = async (req, res) => {
   const H = { Authorization: `Bearer ${KT}` };
   const NS = process.env.INBOX_NS || 'default';
   const keyFor = (num) => num ? ('paused:' + NS + ':' + String(num)) : ('botpaused:' + NS);
+
+  // --- Estado de pago de la suscripcion del cliente (kind=sub) ---
+  // GET  /api/bot-state?kind=sub              -> { cycles:['2026-09-18', ...] }
+  // POST /api/bot-state { kind:'sub', cycle:'2026-09-18', paid:true|false }
+  let _b = req.body;
+  if (typeof _b === 'string') { try { _b = JSON.parse(_b); } catch (e) { _b = {}; } }
+  _b = _b || {};
+  const wantsSub = (req.query && req.query.kind === 'sub') || _b.kind === 'sub';
+  if (wantsSub) {
+    const SUBKEY = 'sub:' + NS;
+    const subRead = async () => {
+      try {
+        const r = await fetch(KU + '/get/' + encodeURIComponent(SUBKEY), { headers: H });
+        const d = await r.json();
+        const v = d && d.result ? JSON.parse(d.result) : null;
+        return (v && Array.isArray(v.cycles)) ? v : { cycles: [] };
+      } catch (e) { return { cycles: [] }; }
+    };
+    if (req.method !== 'POST') {
+      const cur = await subRead();
+      return res.status(200).json({ cycles: cur.cycles, updatedAt: cur.updatedAt || null });
+    }
+    const cycle = String(_b.cycle || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cycle)) return res.status(400).json({ error: 'bad_cycle' });
+    const cur = await subRead();
+    const set = cur.cycles.filter(function (c) { return c !== cycle; });
+    if (_b.paid !== false) set.push(cycle);
+    set.sort();
+    const out = { cycles: set.slice(-24), updatedAt: new Date().toISOString() };
+    try {
+      await fetch(KU + '/set/' + encodeURIComponent(SUBKEY), {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + KT, 'Content-Type': 'text/plain' },
+        body: JSON.stringify(out)
+      });
+    } catch (e) { return res.status(500).json({ error: 'kv_write' }); }
+    return res.status(200).json({ ok: true, cycles: out.cycles });
+  }
   try {
     if (req.method === 'POST') {
       const b = req.body || {};
