@@ -246,7 +246,7 @@ function fmtCost(v){return v==null?'—':('$'+Number(v).toFixed(4)+' USD');}
 /* ---- Suscripción del cliente ---- */
 const SUB_START='2026-08-18';   // fecha de inicio de la suscripción
 const SUB_PLAN='mensual';
-let PAY_LINK='';                 // <-- PEGA AQUI EL LINK DE PAGO CUANDO LO TENGAS (ej: 'https://...')
+let PAY_LINK='https://checkout.bold.co/payment/LNK_VUV6P90XDA';                 // <-- PEGA AQUI EL LINK DE PAGO CUANDO LO TENGAS (ej: 'https://...')
 function subNextDue(){
   const start=new Date(SUB_START+'T00:00:00');
   let due=new Date(start); due.setMonth(due.getMonth()+1);
