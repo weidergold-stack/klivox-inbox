@@ -259,8 +259,8 @@ function fmtDate(d){return new Date(d).toLocaleDateString('es-CO',{day:'2-digit'
 window.SUBPAID=[];
 function subCycleId(d){const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
 function subIsPaid(){try{return SUBPAID.indexOf(subCycleId(subNextDue()))!==-1;}catch(e){return false;}}
-async function subLoad(){try{const r=await fetch('/api/sub',{headers:hdr()});const d=await r.json();if(d&&Array.isArray(d.cycles))window.SUBPAID=d.cycles;}catch(e){}try{renderSub();}catch(e){}}
-async function subMark(paid){try{const r=await fetch('/api/sub',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({cycle:subCycleId(subNextDue()),paid:!!paid})});const d=await r.json();if(d&&Array.isArray(d.cycles)){window.SUBPAID=d.cycles;renderSub();try{closeModal();}catch(e){}}else{alert('No se pudo guardar.');}}catch(e){alert('No se pudo guardar.');}}
+async function subLoad(){try{const r=await fetch('/api/bot-state?kind=sub',{headers:hdr()});const d=await r.json();if(d&&Array.isArray(d.cycles))window.SUBPAID=d.cycles;}catch(e){}try{renderSub();}catch(e){}}
+async function subMark(paid){try{const r=await fetch('/api/bot-state',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({kind:'sub',cycle:subCycleId(subNextDue()),paid:!!paid})});const d=await r.json();if(d&&Array.isArray(d.cycles)){window.SUBPAID=d.cycles;renderSub();try{closeModal();}catch(e){}}else{alert('No se pudo guardar.');}}catch(e){alert('No se pudo guardar.');}}
 function renderSub(){
   const box=document.getElementById('sub'); if(!box)return;
   const due=subNextDue(); const days=subDaysLeft(); const paid=subIsPaid(); const warn=(days<=3)&&!paid;
