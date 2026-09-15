@@ -256,14 +256,21 @@ function subNextDue(){
 }
 function subDaysLeft(){ return Math.ceil((subNextDue()-new Date())/86400000); }
 function fmtDate(d){return new Date(d).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'});}
+window.SUBPAID=[];
+function subCycleId(d){const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+function subIsPaid(){try{return SUBPAID.indexOf(subCycleId(subNextDue()))!==-1;}catch(e){return false;}}
+async function subLoad(){try{const r=await fetch('/api/sub',{headers:hdr()});const d=await r.json();if(d&&Array.isArray(d.cycles))window.SUBPAID=d.cycles;}catch(e){}try{renderSub();}catch(e){}}
+async function subMark(paid){try{const r=await fetch('/api/sub',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({cycle:subCycleId(subNextDue()),paid:!!paid})});const d=await r.json();if(d&&Array.isArray(d.cycles)){window.SUBPAID=d.cycles;renderSub();try{closeModal();}catch(e){}}else{alert('No se pudo guardar.');}}catch(e){alert('No se pudo guardar.');}}
 function renderSub(){
   const box=document.getElementById('sub'); if(!box)return;
-  const due=subNextDue(); const days=subDaysLeft(); const warn=days<=3;
-  const payBtn=warn?(PAY_LINK?'<a class="sub-pay" href="'+PAY_LINK+'" target="_blank" rel="noopener">Pagar ahora</a>':'<span class="sub-pay off">Falta configurar el link de pago</span>'):'';
+  const due=subNextDue(); const days=subDaysLeft(); const paid=subIsPaid(); const warn=(days<=3)&&!paid;
+  const admin=/[?&]admin=1/.test(location.search);
+  let extra=warn?(PAY_LINK?'<a class="sub-pay" href="'+PAY_LINK+'" target="_blank" rel="noopener">Pagar ahora</a>':'<span class="sub-pay off">Falta configurar el link de pago</span>'):'';
+  if(admin) extra+=paid?'<span class="sub-pay off" style="cursor:pointer" onclick="subMark(false)">Deshacer</span>':'<span class="sub-pay off" style="cursor:pointer" onclick="subMark(true)">Marcar como pagada</span>';
   box.className='sub'+(warn?' warn':'');
-  box.innerHTML='<div class="sub-top">💳 Suscripción '+SUB_PLAN+(warn?' <span class="sub-badge">Por vencer</span>':'')+'</div>'+
+  box.innerHTML='<div class="sub-top">💳 Suscripción '+SUB_PLAN+(warn?' <span class="sub-badge">Por vencer</span>':(paid?' <span class="sub-badge">Al día</span>':''))+'</div>'+
     '<div class="sub-sub">Inició 18 ago · Próximo pago: '+fmtDate(due)+'</div>'+
-    '<div class="sub-days">'+(days>0?('Faltan '+days+' día'+(days===1?'':'s')):'Vence hoy')+'</div>'+payBtn;
+    '<div class="sub-days">'+(paid?'Pago recibido ✓':(days>0?('Faltan '+days+' día'+(days===1?'':'s')):'Vence hoy'))+'</div>'+extra;
 }
 function subAlertModal(){
   const due=subNextDue(); const days=subDaysLeft();
@@ -304,7 +311,8 @@ async function login(){
   document.getElementById('login').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   await load();loadMetaTemplates();loadUsage();renderSub();
-  if(subDaysLeft()<=3) subAlertModal();
+  await subLoad();
+  if(subDaysLeft()<=3 && !subIsPaid()) subAlertModal();
   setInterval(load,5000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
 }
 
