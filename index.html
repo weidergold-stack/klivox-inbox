@@ -753,18 +753,45 @@ window.__tlFilter='';
 function tlDef(id){for(var i=0;i<TL.defs.length;i++){if(TL.defs[i].id===id)return TL.defs[i];}return null;}
 function tlOf(n){var a=TL.assign[n];return Array.isArray(a)?a:[];}
 function tlNewId(){return 't'+Date.now().toString(36)+Math.floor(Math.random()*1000);}
+var TL_SEED=[{id:'s1',name:'Pendiente',color:'#ef6c00'},{id:'s2',name:'Agendado',color:'#2e7d32'},{id:'s3',name:'Cotizado',color:'#1565c0'},{id:'s4',name:'Tratamiento activo',color:'#8e24aa'},{id:'s5',name:'No contesta',color:'#c62828'}];
+function tlApply(L){
+  if(!L||typeof L!=='object')return;
+  if(Array.isArray(L.defs)) TL.defs=L.defs;
+  if(L.assign&&typeof L.assign==='object'){
+    var tch=window.__tlTouched||{};
+    var mg=Object.assign({},L.assign);
+    Object.keys(tch).forEach(function(k){ if(TL.assign[k]&&TL.assign[k].length)mg[k]=TL.assign[k]; else delete mg[k]; });
+    TL.assign=mg;
+  }
+}
 async function tlLoad(){
-  try{var r=await fetch('/api/labels',{headers:hdr()});var d=await r.json();var L=(d&&d.labels)||{};
-    TL.defs=Array.isArray(L.defs)?L.defs:[];TL.assign=(L.assign&&typeof L.assign==='object')?L.assign:{};}catch(e){}
-  if(!TL.defs.length){TL.defs=[{id:'s1',name:'Pendiente',color:'#ef6c00'},{id:'s2',name:'Agendado',color:'#2e7d32'},{id:'s3',name:'Cotizado',color:'#1565c0'},{id:'s4',name:'Tratamiento activo',color:'#8e24aa'},{id:'s5',name:'No contesta',color:'#c62828'}];tlSave();}
+  var ok=false;
+  try{
+    var r=await fetch('/api/labels',{headers:hdr()});
+    if(r.ok){ var d=await r.json(); tlApply((d&&d.labels)||{}); ok=true; }
+  }catch(e){}
+  if(ok&&!TL.defs.length){ TL.defs=TL_SEED.slice(); tlSave(); }
   try{tlBar();tlInject();}catch(e){}
 }
+async function tlRefresh(){
+  if(document.querySelector('.tlmod'))return;
+  try{
+    var r=await fetch('/api/labels',{headers:hdr()});
+    if(!r.ok)return;
+    var d=await r.json(); tlApply((d&&d.labels)||{});
+    try{tlBar();tlInject();}catch(e){}
+  }catch(e){}
+}
 function tlSave(){
-  window.__tlChain=(window.__tlChain||Promise.resolve()).then(async function(){
-    try{var r=await fetch('/api/labels',{headers:hdr()});var d=await r.json();var S=(d&&d.labels)||{};
-      var sa=(S.assign&&typeof S.assign==='object')?S.assign:{};
-      var mg=Object.assign({},sa);var tch=window.__tlTouched||{};Object.keys(tch).forEach(function(k){if(TL.assign[k]&&TL.assign[k].length)mg[k]=TL.assign[k];else delete mg[k];});TL.assign=mg;}catch(e){}
-    return fetch('/api/labels',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({labels:{defs:TL.defs,assign:TL.assign}})}).catch(function(){});
+  var tch=window.__tlTouched||{};
+  var set={};
+  Object.keys(tch).forEach(function(k){ var v=TL.assign[k]; set[k]=(v&&v.length)?v:null; });
+  var payload={set:set,defs:TL.defs};
+  window.__tlChain=(window.__tlChain||Promise.resolve()).then(function(){
+    return fetch('/api/labels',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify(payload)})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){ if(d&&d.labels){ tlApply(d.labels); try{tlInject();}catch(e){} } })
+      .catch(function(){});
   });
   return window.__tlChain;
 }
@@ -862,6 +889,7 @@ function tlBar(){
 }
 if(typeof renderConvs==='function'&&!window.__tlWrapped){window.__tlWrapped=true;var _rcT=renderConvs;renderConvs=function(){_rcT.apply(this,arguments);try{tlInject();}catch(e){}};}
 tlLoad();
+setInterval(tlRefresh,25000);
 
 
 /* ===== Panel de configuracion del Bot (Tania) ===== */
