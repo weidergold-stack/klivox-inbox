@@ -744,10 +744,30 @@ window.AUX_COLOR={'Alejandra':'#d81b60','Tatiana':'#8e24aa'};
 window.DOC_COLOR={'Dr Weider':'#2e7d32','Dra Fernanda':'#1565c0','Dra Daniela':'#ef6c00'};
 window.labels=window.labels||{};
 window.__lblFA=''; window.__lblFD='';
-async function loadLabels(){ try{ const r=await fetch('/api/labels',{headers:hdr()}); const dd=await r.json(); if(dd&&dd.labels) window.labels=dd.labels; }catch(e){} try{injectLabels();}catch(e){} }
-function saveLabels(){ window.__saveChain=(window.__saveChain||Promise.resolve()).then(function(){ return fetch('/api/labels',{method:'POST',headers:hdr(),body:JSON.stringify({labels:window.labels})}).catch(function(){}); }); return window.__saveChain; }
+async function loadLabels(){
+  try{
+    const r=await fetch('/api/labels',{headers:hdr()});
+    if(r.ok){ const dd=await r.json(); if(dd&&dd.labels&&typeof dd.labels==='object'){
+      var tch=window.__lblTouched||{};
+      var mg=Object.assign({},dd.labels);
+      Object.keys(tch).forEach(function(k){ var v=window.labels[k]; if(v&&(v.a||v.d))mg[k]=v; else delete mg[k]; });
+      window.labels=mg;
+    } }
+  }catch(e){}
+  try{injectLabels();}catch(e){}
+}
+function saveLabels(chg){
+  var payload={set:chg||{}};
+  window.__saveChain=(window.__saveChain||Promise.resolve()).then(function(){
+    return fetch('/api/labels',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify(payload)})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(d){ if(d&&d.labels&&typeof d.labels==='object'){ window.labels=d.labels; try{injectLabels();}catch(e){} } })
+      .catch(function(){});
+  });
+  return window.__saveChain;
+}
 function lblOf(n){ return window.labels[n]||{}; }
-function setLabel(n,t,v){ var c=window.labels[n]||{}; if(v)c[t]=v; else delete c[t]; if(!c.a&&!c.d)delete window.labels[n]; else window.labels[n]=c; saveLabels(); injectLabels(); }
+function setLabel(n,t,v){ window.__lblTouched=window.__lblTouched||{}; window.__lblTouched[n]=1; var c=Object.assign({},window.labels[n]||{}); if(v)c[t]=v; else delete c[t]; var empty=(!c.a&&!c.d); if(empty)delete window.labels[n]; else window.labels[n]=c; var chg={}; chg[n]=empty?null:c; saveLabels(chg); injectLabels(); }
 function lblPass(n){ var l=lblOf(n); if(window.__lblFA&&l.a!==window.__lblFA)return false; if(window.__lblFD&&l.d!==window.__lblFD)return false; return true; }
 function closeLblPop(){ document.querySelectorAll('.lblpop').forEach(function(p){p.remove();}); }
 function pickLabel(ev,n,t){ ev.stopPropagation(); ev.preventDefault(); closeLblPop(); var list=t==='a'?AUX_LIST:DOC_LIST; var cm=t==='a'?AUX_COLOR:DOC_COLOR; var pop=document.createElement('div'); pop.className='lblpop'; list.concat(['__clear']).forEach(function(v){ var o=document.createElement('div'); o.className='lblopt'+(v==='__clear'?' lblclear':''); o.textContent=v==='__clear'?'Quitar':v; if(v!=='__clear')o.style.borderLeft='4px solid '+(cm[v]||'#777'); o.addEventListener('click',function(e){ e.stopPropagation(); setLabel(n,t,v==='__clear'?'':v); closeLblPop(); }); pop.appendChild(o); }); document.body.appendChild(pop); var r=ev.target.getBoundingClientRect(); pop.style.left=Math.min(r.left,window.innerWidth-180)+'px'; pop.style.top=(r.bottom+4)+'px'; setTimeout(function(){ document.addEventListener('click',closeLblPop,{once:true}); },0); }
@@ -757,6 +777,7 @@ function buildLblFilterBar(){ var host=document.getElementById('convs'); if(!hos
 if(typeof renderConvs==='function'&&!window.__lblWrapped){ window.__lblWrapped=true; var _rcL=renderConvs; renderConvs=function(){ _rcL.apply(this,arguments); try{injectLabels();}catch(e){} }; }
 try{ buildLblFilterBar(); }catch(e){}
 loadLabels();
+setInterval(loadLabels,25000);
 
 
 (function(){if(window.__rtWrapped)return;window.__rtWrapped=true;window.__drafts={};var _o=renderThread;renderThread=function(num){var ta=document.getElementById('reply');var keep=ta?ta.value:'';var ss=ta?ta.selectionStart:0;var se=ta?ta.selectionEnd:0;var had=(ta&&document.activeElement===ta);var prev=window.__thLast;var same=(prev===num);if(!same&&prev!==undefined&&ta){window.__drafts[prev]=keep;}var r=_o.apply(this,arguments);try{var t2=document.getElementById('reply');if(t2){if(same){if(keep&&t2.value!==keep){t2.value=keep;try{t2.setSelectionRange(ss,se);}catch(e){}}}else{t2.value=window.__drafts[num]||'';}if(had&&document.activeElement!==t2){try{t2.focus();}catch(e){}}}}catch(e){}return r;};})();
