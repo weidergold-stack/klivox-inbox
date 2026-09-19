@@ -296,8 +296,9 @@ function renderSub(){
   const over=subOverdue(); const warn=(days<=3)&&!over;
   let badge=''; if(over)badge=' <span class="sub-badge">Vencida</span>'; else if(warn)badge=' <span class="sub-badge">Por vencer</span>';
   let estado;
-  if(over)estado='Vencida hace '+Math.abs(days)+' dia'+(Math.abs(days)===1?'':'s');
-  else if(days>0)estado='Faltan '+days+' dia'+(days===1?'':'s');
+  if(over&&days===0)estado='Vence hoy · pago pendiente';
+  else if(over)estado='Vencida hace '+Math.abs(days)+' día'+(Math.abs(days)===1?'':'s');
+  else if(days>0)estado='Faltan '+days+' día'+(days===1?'':'s');
   else estado='Vence hoy';
   let extra=(warn||over)?(PAY_LINK?'<a class="sub-pay" href="'+PAY_LINK+'" target="_blank" rel="noopener">Pagar ahora</a>':'<span class="sub-pay off">Falta configurar el link de pago</span>'):'';
   if(subIsAdmin()) extra+='<span class="sub-pay off" style="cursor:pointer" onclick="subMark(true)">Marcar como pagada</span>'+(SUBPAID.length?'<span class="sub-pay off" style="cursor:pointer" onclick="subMark(false)">Deshacer</span>':'');
