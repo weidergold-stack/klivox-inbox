@@ -48,6 +48,9 @@ module.exports = async (req, res) => {
       const ct = m.content || {};
       out.push({
         id: m.id || '',                 // ID Zavu del mensaje — necesario para responder citando (replyToMessageId)
+        rpid: ct.replyToMessageId || '', // si este mensaje es una respuesta citada: ID del mensaje citado
+        rtxt: ct.replyToText || '',      // texto (recorte) del mensaje citado
+        rtype: ct.replyToMessageType || '', // tipo del mensaje citado (text/image/audio/...)
         direction: inbound ? 'inbound' : 'outbound',
         from: m.from || '',
         to: m.to || '',
