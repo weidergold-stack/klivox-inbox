@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
       const inbound = !!(m.from && (m.from === contact || (cdig && norm(m.from) === cdig)));
       const ct = m.content || {};
       out.push({
+        id: m.id || '',                 // ID Zavu del mensaje — necesario para responder citando (replyToMessageId)
         direction: inbound ? 'inbound' : 'outbound',
         from: m.from || '',
         to: m.to || '',

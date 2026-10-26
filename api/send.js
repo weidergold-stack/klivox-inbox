@@ -3,6 +3,7 @@
 //   1) Texto libre     -> { to, body }
 //   2) Plantilla Meta  -> { to, contentSid, variables? }   (contentSid = templateId de Zavu)
 //   3) Archivo (media) -> { to, mediaUrl, body? }           (PDF/imagen; body = caption)
+// Opcional en cualquier modo: { replyToMessageId } -> responde citando ese mensaje (cita nativa de WhatsApp).
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), INBOX_PASSWORD
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
@@ -17,6 +18,7 @@ module.exports = async (req, res) => {
   const contentSid = (body.contentSid || '').trim(); // templateId de Zavu
   const variables = body.variables || null;          // { "1": "Laura" }
   const mediaUrl = (body.mediaUrl || '').trim();
+  const replyToId = (body.replyToMessageId || '').trim(); // ID Zavu del mensaje a citar
 
   if (!to || (!text && !contentSid && !mediaUrl)) {
     res.status(400).json({ ok: false, error: 'Faltan datos' }); return;
@@ -37,6 +39,12 @@ module.exports = async (req, res) => {
     if (text) payload.text = text; // caption
   } else {
     payload.text = text;
+  }
+
+  // Cita nativa de WhatsApp: adjunta replyToMessageId al content (vale para texto, media o plantilla).
+  if (replyToId) {
+    payload.content = payload.content || {};
+    payload.content.replyToMessageId = replyToId;
   }
 
   const headers = { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
