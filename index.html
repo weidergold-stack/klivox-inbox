@@ -480,7 +480,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
       } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
       const bd=esc(m.body);
       const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
-      return `<div class="bub ${cls}">${inner}<span class="t">${fmtTime(m.date)}</span>${m.id?`<button class="rbtn" title="Responder" onclick="setReply('${m.id}')">↩</button>`:''}</div>`}).join('');
+      return `<div class="bub ${cls}">${(m.rtxt||m.rpid)?`<div class="qrep" style="border-left:2px solid var(--green);background:rgba(0,0,0,.05);border-radius:5px;padding:3px 7px;margin-bottom:4px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↩ ${esc(m.rtxt||'Mensaje citado')}</div>`:''}${inner}<span class="t">${fmtTime(m.date)}</span>${m.id?`<button class="rbtn" title="Responder" onclick="setReply('${m.id}')">↩</button>`:''}</div>`}).join('');
   }
   if(_atBot||_chgConv){th.scrollTop=th.scrollHeight;}
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
