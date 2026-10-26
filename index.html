@@ -60,6 +60,7 @@
   .in{align-self:flex-start;background:var(--panel);border:1px solid var(--brd);border-bottom-left-radius:4px}
   .out{align-self:flex-end;background:#075e54;border-bottom-right-radius:4px}
   .out .t{color:#bfeadf}
+  .bub audio{height:40px;vertical-align:middle}
   .composer{border-top:1px solid var(--brd);padding:10px 14px;background:var(--panel2)}
   .win-warn{font-size:12px;color:#fcd34d;margin-bottom:8px;display:none}
   .composer .row{display:flex;gap:9px;align-items:flex-end}
@@ -296,7 +297,7 @@ function renderConvs(){
   el.innerHTML=list.map(c=>{
     const last=c.msgs.length?c.msgs[c.msgs.length-1]:null;
     const unread=last&&last.direction==='inbound';
-    const prevBody=last?(last.type==='media'?('📷 '+(esc(last.body)||'Imagen')):(esc(last.body)||'—')):'';
+    const prevBody=last?(last.mediaUrl?'📎 Adjunto':(esc(last.body)||'—')):'';
     const prev=last? ((last.direction!=='inbound'?'Tú: ':'')+prevBody) : 'Nuevo chat — escribe el primer mensaje';
     const tm=last?fmtTime(last.date):'';
     return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
@@ -324,14 +325,25 @@ function renderThread(num){
   paintChatBotBtn(num);
   const th=document.getElementById('thread');
   if(!c.msgs.length){
+    th.removeAttribute('data-sig');
+    th.setAttribute('data-num',num);
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
+    th.scrollTop=th.scrollHeight;
   }else{
-    th.innerHTML=c.msgs.map(function(m){var cls=m.direction==='inbound'?'in':'out';var inner;
-      if(m.type==='media'&&m.mediaUrl){var u=esc(m.mediaUrl);inner='<a href="'+u+'" target="_blank" rel="noopener"><img src="'+u+'" alt="adjunto" style="max-width:230px;max-height:300px;border-radius:10px;display:block" onerror="this.onerror=null;this.outerHTML=&#39;📎 <u>Ver archivo</u>&#39;"/></a>'+(m.body?'<div style="margin-top:6px">'+esc(m.body)+'</div>':'');}
-      else{inner=esc(m.body)||'<i>(sin texto)</i>';}
-      return '<div class="bub '+cls+'">'+inner+'<span class="t">'+fmtTime(m.date)+'</span></div>';}).join('');
+    // Re-renderiza el hilo SOLO si cambió (evita parpadeo y no corta el audio que se está escuchando).
+    const lastM=c.msgs[c.msgs.length-1];
+    const sig=c.msgs.length+'|'+lastM.sid+'|'+lastM.date;
+    if(th.getAttribute('data-sig')!==sig||th.getAttribute('data-num')!==num){
+      th.innerHTML=c.msgs.map(function(m){var cls=m.direction==='inbound'?'in':'out';var inner;
+        if(m.mediaUrl){var u=esc(m.mediaUrl);var hideCap=(!m.body)||/^\s*\[?\s*unsupported/i.test(m.body);var cap=hideCap?'':'<div style="margin-top:6px">'+esc(m.body)+'</div>';inner='<div class="media" data-media="'+u+'">📎 Cargando adjunto…</div>'+cap;}
+        else{inner=esc(m.body)||'<i>(sin texto)</i>';}
+        return '<div class="bub '+cls+'">'+inner+'<span class="t">'+fmtTime(m.date)+'</span></div>';}).join('');
+      th.setAttribute('data-sig',sig);
+      th.setAttribute('data-num',num);
+      hydrateMedia(th);
+      th.scrollTop=th.scrollHeight;
+    }
   }
-  th.scrollTop=th.scrollHeight;
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
   const comp=document.getElementById('composer');
   const ta2=document.getElementById('reply');
@@ -347,6 +359,37 @@ function renderThread(num){
     ta2.value=''; ta2.disabled=true; if(sb)sb.disabled=true;
     ta2.placeholder='🔒 Fuera de la ventana de 24 h — usa 📋 plantillas';
     document.getElementById('winWarn').style.display='block';
+  }
+}
+
+// ---- Adjuntos: pinta cada medio según su tipo (audio -> reproductor, imagen, video, enlace) ----
+let mediaMeta={};
+async function hydrateMedia(root){
+  const nodes=root.querySelectorAll('.media[data-media]');
+  for(const el of nodes){
+    const u=el.getAttribute('data-media');
+    el.removeAttribute('data-media');
+    const sidM=/sid=([^&]+)/.exec(u); const key=sidM?sidM[1]:u;
+    try{
+      let ct=mediaMeta[key];
+      if(ct===undefined){
+        const meta=await fetch(u+'&meta=1',{cache:'force-cache'}).then(r=>r.json());
+        ct=((meta&&meta.contentType)||'').toLowerCase(); mediaMeta[key]=ct;
+      }
+      renderMediaEl(el,u,ct);
+    }catch(e){ el.innerHTML='<a href="'+u+'" target="_blank" rel="noopener">📎 <u>Ver archivo</u></a>'; }
+  }
+}
+function renderMediaEl(el,u,ct){
+  if(ct && ct.indexOf('audio/')===0){
+    el.innerHTML='<audio controls preload="none" src="'+u+'" style="max-width:240px;width:240px"></audio>';
+  }else if(ct && ct.indexOf('image/')===0){
+    el.innerHTML='<a href="'+u+'" target="_blank" rel="noopener"><img src="'+u+'" alt="adjunto" style="max-width:230px;max-height:300px;border-radius:10px;display:block"/></a>';
+  }else if(ct && ct.indexOf('video/')===0){
+    el.innerHTML='<video controls preload="none" src="'+u+'" style="max-width:240px;border-radius:10px"></video>';
+  }else{
+    const label=(ct&&ct.indexOf('pdf')>=0)?'Ver PDF':'Ver archivo';
+    el.innerHTML='<a href="'+u+'" target="_blank" rel="noopener">📎 <u>'+label+'</u></a>';
   }
 }
 
