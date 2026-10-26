@@ -1,5 +1,6 @@
-// api/media.js — Proxy seguro de media de Twilio para mostrar imágenes/archivos en la bandeja.
-// Uso: /api/media?sid=<MessageSid>&i=<indice>  -> devuelve el contenido con su content-type.
+// api/media.js — Proxy seguro de media de Twilio para mostrar imágenes/archivos/audio en la bandeja.
+// Uso: /api/media?sid=<MessageSid>&i=<indice>         -> devuelve el contenido con su content-type.
+//      /api/media?sid=<MessageSid>&i=<indice>&meta=1  -> devuelve JSON { contentType } sin bajar el binario.
 // No expone credenciales: el AccountSid/AuthToken quedan en el servidor. El MessageSid (34
 // caracteres) actúa como token y solo sirve media de la propia cuenta de Twilio.
 // Requiere env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
@@ -8,6 +9,7 @@ module.exports = async (req, res) => {
   const TOKEN = process.env.TWILIO_AUTH_TOKEN;
   const msg = String((req.query && req.query.sid) || '');
   const idx = parseInt((req.query && req.query.i) || '0', 10) || 0;
+  const metaOnly = String((req.query && req.query.meta) || '') === '1';
   if (!SID || !TOKEN) { res.status(500).send('config'); return; }
   // Valida que 'sid' tenga forma de SID de Twilio (2 letras + 32 hex) para evitar abuso.
   if (!/^[A-Za-z]{2}[a-fA-F0-9]{32}$/.test(msg)) { res.status(400).send('bad sid'); return; }
@@ -20,8 +22,18 @@ module.exports = async (req, res) => {
     const ld = await lr.json();
     const list = (ld && ld.media_list) || [];
     const item = list[idx] || list[0];
-    if (!item) { res.status(404).send('no media'); return; }
+    if (!item) {
+      if (metaOnly) { res.setHeader('Content-Type', 'application/json'); res.status(200).end(JSON.stringify({ contentType: null, count: 0 })); return; }
+      res.status(404).send('no media'); return;
+    }
     const ct = item.content_type || 'application/octet-stream';
+    // Modo meta: solo el tipo, para que la bandeja elija audio / imagen / video / enlace.
+    if (metaOnly) {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.status(200).end(JSON.stringify({ contentType: ct, index: idx, count: list.length }));
+      return;
+    }
     // 2) Traer el binario (Twilio redirige a su CDN; fetch sigue el redirect).
     const binUrl = `https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages/${msg}/Media/${item.sid}`;
     const br = await fetch(binUrl, { headers: { Authorization: auth } });

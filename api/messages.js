@@ -1,4 +1,4 @@
-// Bandeja Klivox — lista los mensajes de WhatsApp desde Twilio (con soporte de imágenes/archivos)
+// Bandeja Klivox — lista los mensajes de WhatsApp desde Twilio
 // Requiere env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, INBOX_PASSWORD
 module.exports = async (req, res) => {
   if ((req.headers['x-inbox-pass'] || '') !== process.env.INBOX_PASSWORD) {
@@ -15,14 +15,24 @@ module.exports = async (req, res) => {
     const messages = (d.messages || [])
       .filter(m => (m.from && m.from.startsWith('whatsapp:')) || (m.to && m.to.startsWith('whatsapp:')))
       .map(m => {
-        const numMedia = parseInt(m.num_media || '0', 10) || 0;
-        const out = { sid: m.sid, from: m.from, to: m.to, body: m.body, direction: m.direction, status: m.status, date: m.date_created };
-        if (numMedia > 0) {
-          out.numMedia = numMedia;
-          out.type = 'media';
-          out.mediaUrl = '/api/media?sid=' + encodeURIComponent(m.sid);
-        }
-        return out;
+        // num_media viene como string ("0", "1", ...). Si hay adjunto, exponemos la
+        // URL del proxy /api/media para que la bandeja pueda pintarlo (audio, imagen, etc.).
+        const nm = parseInt(m.num_media || '0', 10) || 0;
+        // Algunos tipos de WhatsApp (p. ej. notas de voz) llegan sin texto y Twilio/el
+        // canal los deja como "[unsupported]"; en esos casos también intentamos traer el medio.
+        const looksUnsupported = /^\s*\[?\s*unsupported/i.test(m.body || '');
+        const hasMedia = nm > 0 || looksUnsupported;
+        return {
+          sid: m.sid,
+          from: m.from,
+          to: m.to,
+          body: m.body,
+          numMedia: nm,
+          mediaUrl: hasMedia ? ('/api/media?sid=' + m.sid + '&i=0') : null,
+          direction: m.direction,
+          status: m.status,
+          date: m.date_created
+        };
       });
     res.status(200).json({ messages });
   } catch (e) {
