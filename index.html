@@ -420,7 +420,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
       } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
       const bd=esc(m.body);
       const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
-      return `<div class="bub ${cls}">${inner}<span class="t">${fmtTime(m.date)}</span></div>`}).join('');
+      return `<div class="bub ${cls}">${inner}<span class="t">${fmtTime(m.date)}</span>${m.id?`<button class="rbtn" title="Responder" onclick="setReply('${m.id}')">↩</button>`:''}</div>`}).join('');
   }
   if(_atBot||_chgConv){th.scrollTop=th.scrollHeight;}
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
@@ -472,13 +472,13 @@ async function onFilePicked(inp){
   await load();loadUsage();
 }
 
-async function send(){
+let replyTo=null;function setReply(id){  const c=current&&convs[current];if(!c)return;  const m=(c.msgs||[]).find(x=>x.id===id);if(!m)return;  const lbl={image:'📷 Imagen',audio:'🎵 Nota de voz',video:'🎞️ Video',document:'📎 Documento',sticker:'🙂 Sticker'};  const t=(m.body&&m.body.trim())||lbl[m.type]||'📎 Adjunto';  replyTo={id:id,text:t,dir:m.direction};  renderReplyBar();  const ta=document.getElementById('reply');if(ta&&!ta.disabled)ta.focus();}function clearReply(){replyTo=null;renderReplyBar();}function renderReplyBar(){  const b=document.getElementById('replyBar');if(!b)return;  if(!replyTo){b.className='hidden';b.innerHTML='';return;}  b.className='';  b.innerHTML='<div class="rbtx"><b>Respondiendo a '+(replyTo.dir==='inbound'?'paciente':'ti')+'</b><span>'+esc(replyTo.text)+'</span></div><button class="rbx" title="Cancelar" onclick="clearReply()">×</button>';}(function(){  try{    var st=document.createElement('style');    st.textContent='.bub{position:relative}.rbtn{position:absolute;top:3px;right:4px;border:none;background:rgba(0,0,0,.07);color:#667781;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s;padding:0}.bub:hover .rbtn{opacity:1}#replyBar{display:flex;align-items:center;gap:8px;background:var(--greenL);border-left:3px solid var(--green);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12.5px}#replyBar .rbtx{flex:1;min-width:0;overflow:hidden}#replyBar .rbtx b{display:block;color:var(--greenD);font-size:11px}#replyBar .rbtx span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}#replyBar .rbx{border:none;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1}';    document.head.appendChild(st);    var comp=document.getElementById('composer');    if(comp&&!document.getElementById('replyBar')){var rb=document.createElement('div');rb.id='replyBar';rb.className='hidden';var row=comp.querySelector('.row');if(row)comp.insertBefore(rb,row);else comp.appendChild(rb);}    if(typeof open_==='function'){var _o=open_;open_=function(n){clearReply();return _o(n);};}  }catch(e){}})();async function send(){
   if(!current)return;
   const ta=document.getElementById('reply');
   if(ta.disabled)return;
   const text=ta.value.trim();if(!text)return;
   document.getElementById('sendErr').textContent='';ta.value='';
-  const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify({to:current,body:text})});
+  const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify(Object.assign({to:current,body:text},replyTo?{replyToMessageId:replyTo.id}:{}))});clearReply();
   const d=await r.json();
   if(!d.ok){document.getElementById('sendErr').textContent=d.code===63016?'Fuera de la ventana de 24 h: se requiere una plantilla aprobada.':('No se pudo enviar: '+(d.error||'error'));ta.value=text;}
   await load();loadUsage();
