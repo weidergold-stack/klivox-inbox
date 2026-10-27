@@ -210,7 +210,7 @@ function isUnread(c){const last=(c&&c.msgs&&c.msgs.length)?c.msgs[c.msgs.length-
 function markUnread(num){unreadSet[num]=1;saveUnread();if(typeof backToList==='function')backToList();renderConvs();}
 function setFilter(v){window.__onlyUnread=v;var a=document.getElementById('fltAll'),u=document.getElementById('fltUnread');if(a)a.classList.toggle('active',!v);if(u)u.classList.toggle('active',v);renderConvs();}
 function lastInboundTime(c){let t=0;for(const m of ((c&&c.msgs)||[])){if(m.direction==='inbound'){const x=new Date(m.date).getTime();if(x>t)t=x;}}return t;}
-function markRead(num){const c=convs[num];if(!c)return;const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}if(unreadSet[num]){delete unreadSet[num];saveUnread();}}
+function markRead(num){let c=convs[num];if(!c){if(window.__tc&&window.__tc[num]){c=convs[num]={num,msgs:window.__tc[num]};}else return;}const t=lastInboundTime(c);if(t){readMap[num]=t;saveRead();}if(unreadSet[num]){delete unreadSet[num];saveUnread();}}
 const EMOJIS='😀 😃 😄 😁 😆 😊 🙂 😉 😍 😘 🥰 😗 😙 😚 🤗 🤩 🥳 😎 🤓 🧐 🤔 🙃 😌 😴 😪 😝 😜 😋 😛 🤤 🥺 😢 😭 😅 😂 🤣 😳 😬 🙄 😮 😯 👍 👎 👌 🤙 👏 🙌 🙏 💪 ✌️ 🤝 👋 💯 🔥 ✨ ⭐ 🌟 💥 ❤️ 🧡 💛 💚 💙 💜 🤍 🖤 💖 💕 💞 😇 🦷 🪥 🩺 💊 💉 🏥 📅 ⏰ ✅ ☑️ ✔️ ❌ ⚠️ 📎 📷 🎉 🎊'.split(' ').filter(Boolean);
 function closeEmoji(){var p=document.getElementById('emojiPanel');if(p)p.remove();document.removeEventListener('click',emojiOutside,true);}
 function emojiOutside(e){var p=document.getElementById('emojiPanel');if(p&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.emo-btn')))closeEmoji();}
@@ -365,7 +365,7 @@ async function load(){
       convs[other].msgs.push(m);
     }
     for(const num of contacts){ if(!convs[num]) convs[num]={num,msgs:[]}; }
-    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){if(convs[_k]){var _c=window.__tc[_k];var _cl=_c[_c.length-1];var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}}
+    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){var _c=window.__tc[_k];if(!_c||!_c.length){continue;}var _cl=_c[_c.length-1];if(!convs[_k]){convs[_k]={num:_k,msgs:_c};continue;}var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{convs[_k].msgs=_c;delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}
     if(current&&convs[current])markRead(current);
     renderConvs();
     if(current&&convs[current]){var _ms=convs[current].msgs||[];var _sig=_ms.length+'|'+((_ms[_ms.length-1]||{}).date||'')+'|'+((_ms[_ms.length-1]||{}).body||'').length;if(_sig!==window.__thSig){window.__thSig=_sig;renderThread(current);}}
@@ -395,11 +395,11 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length&&convs[num]){convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
+async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{const c0=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{};const cid=c0.convId||'';const r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?('&c='+encodeURIComponent(cid)):''),{headers:hdr()});if(r.ok){const d=await r.json();if(d.messages&&d.messages.length){if(!convs[num])convs[num]={num,msgs:[]};convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}}catch(_){}}
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){var _th0=document.getElementById('thread');var _atBot=(!_th0)||((_th0.scrollHeight-_th0.scrollTop-_th0.clientHeight)<90);var _chgConv=(window.__thLast!==num);var _ta0=document.getElementById('reply');var _keep=_ta0?_ta0.value:'';var _ss=_ta0?_ta0.selectionStart:0;var _se=_ta0?_ta0.selectionEnd:0;var _hadFocus=(_ta0&&document.activeElement===_ta0);window.__thLast=num;
-  const c=convs[num];if(!c)return;
+  let c=convs[num];if(!c){if(window.__tc&&window.__tc[num]){c=convs[num]={num,msgs:window.__tc[num]};}else return;}
   document.getElementById('empty').classList.add('hidden');
   document.getElementById('thread').classList.remove('hidden');
   document.getElementById('composer').classList.remove('hidden');
