@@ -475,7 +475,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
     if(!_skip){var _html=c.msgs.map(m=>{const cls=m.direction==='inbound'?'in':'out';
       let media='';
       if(m.mediaUrl){
-        if(m.type==='image'||(m.mimeType||'').indexOf('image/')===0){media='<img src="'+esc(m.mediaUrl)+'" loading="lazy" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer" onclick="window.open(this.src)"/>';}
+        if(m.type==='image'||m.type==='sticker'||(m.mimeType||'').indexOf('image/')===0){media='<img src="'+esc(m.mediaUrl)+'" loading="lazy" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer" onclick="window.open(this.src)"/>';}
         else if((m.type==='audio')||((m.mimeType||'').toLowerCase().indexOf('audio/')===0)){media='<audio controls preload="none" src="'+esc(m.mediaUrl)+'" style="max-width:240px;width:240px"></audio>';} else if((m.type==='video')||((m.mimeType||'').toLowerCase().indexOf('video/')===0)){media='<video controls preload="none" src="'+esc(m.mediaUrl)+'" style="max-width:240px;border-radius:9px;display:block"></video>';} else if(!m.filename){media='<audio controls preload="metadata" src="'+esc(m.mediaUrl)+'" style="max-width:240px;width:240px"></audio>';} else{media='<a href="'+esc(m.mediaUrl)+'" target="_blank" rel="noopener" style="color:#22d3ee;text-decoration:underline">📎 '+esc(m.filename||'Ver archivo')+'</a>';}
       } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
       const bd=linkify(esc(m.body));
