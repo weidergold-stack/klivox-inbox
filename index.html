@@ -231,7 +231,7 @@ async function loadNames(){try{const r=await fetch('/api/names',{headers:hdr()})
 function saveContacts(){localStorage.setItem('kv_contacts',JSON.stringify(contacts));}
 function saveTpl(){localStorage.setItem('kv_templates',JSON.stringify(templates));}
 function hdr(){return{'x-inbox-pass':PASS,'Content-Type':'application/json'}}
-function fmtNum(n){n=(n||'').replace('whatsapp:','').trim();var d=n.replace(/[^\d]/g,'');if(d.length===10&&d[0]==='3')return '+57'+d;if(d.length===12&&d.slice(0,2)==='57')return '+'+d;if(d.length===11&&d.slice(0,2)==='57')return '+57'+d.slice(2);if(n.charAt(0)==='+')return '+'+d;return d?'+'+d:n;}
+function fmtNum(n){n=(n||'').replace('whatsapp:','').trim();if(/[A-Za-z.@]/.test(n))return n;/* BSUID/usuario de WhatsApp (ej. CO.1436...): no es telefono, se deja tal cual para poder responder */var d=n.replace(/[^\d]/g,'');if(d.length===10&&d[0]==='3')return '+57'+d;if(d.length===12&&d.slice(0,2)==='57')return '+'+d;if(d.length===11&&d.slice(0,2)==='57')return '+57'+d.slice(2);if(n.charAt(0)==='+')return '+'+d;return d?'+'+d:n;}
 function nameOf(num){return names[num]||num}
 function initials(s){s=(s||'').trim();const w=s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\s]/g,'').split(/\s+/).filter(Boolean);if(w.length>=2)return w[0][0]+w[1][0];if(w.length===1)return w[0].slice(0,2);const d=s.replace(/\D/g,'');return d.slice(-2)||'#';}
 function fmtTime(d){const t=new Date(d);const now=new Date();const sameDay=t.toDateString()===now.toDateString();
