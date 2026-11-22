@@ -92,6 +92,9 @@ function leerManual(nombre) {
 }
 const MANUAL_CLINIFY = leerManual('clinify.md');
 const MANUAL_KLIVOX = leerManual('klivox.md');
+// IDEI es otra marca que atiende esta misma linea: su manual trae que es y como atender.
+const MANUAL_IDEI = leerManual('idei.md');
+const IDEI = MANUAL_IDEI ? NL + NL + '===== OTRA MARCA QUE ATIENDE ESTA LINEA: IDEI (sigue estas reglas cuando la persona escriba por IDEI; tienen prioridad sobre las de Klivox) =====' + NL + MANUAL_IDEI : '';
 const SOPORTE = (MANUAL_CLINIFY || MANUAL_KLIVOX) ? NL + NL + [
   '## Soporte a clientes (usa los manuales de abajo)',
   'Este numero tambien da soporte a quienes ya usan nuestros productos.',
@@ -320,7 +323,7 @@ const FICHA_TOOL = {
     properties: {
       nombre: { type: 'string', description: 'Nombre de la persona si lo dijo; si no, cadena vacia.' },
       negocio: { type: 'string', description: 'Tipo de negocio o consultorio si lo dijo; si no, cadena vacia.' },
-      interes: { type: 'string', enum: ['crm', 'clinify', 'api_whatsapp', 'otro', 'ninguno'] },
+      interes: { type: 'string', enum: ['crm', 'clinify', 'api_whatsapp', 'idei', 'otro', 'ninguno'], description: 'idei si la persona escribe por IDEI (instituto de entrenamiento en implantologia), no por un producto de Klivox.' },
       es_cliente: { type: 'boolean', description: 'true si ya usa uno de nuestros productos y pide soporte.' },
       necesita_persona: { type: 'boolean', description: 'true solo si el bot le dijo que un asesor le escribira o confirmara algo que quedo pendiente, o si la persona pide hablar con una persona, o hay queja, cobro o urgencia. Una llamada que ya quedo agendada, cambiada o cancelada en la agenda NO cuenta: eso es false.' },
       motivo_persona: { type: 'string', description: 'Por que necesita a una persona, en pocas palabras; si no aplica, cadena vacia.' },
@@ -339,7 +342,7 @@ async function sacarFicha(KEY, messages, reply) {
     headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL, max_tokens: 350,
-      system: 'Lees conversaciones de WhatsApp entre un cliente y el bot de Klivox (CRM con IA, Clinify historia clinica, API de WhatsApp) y llenas la ficha del prospecto. Usa solo lo que dice la conversacion; no inventes.',
+      system: 'Lees conversaciones de WhatsApp entre un cliente y el bot de Klivox (CRM con IA, Clinify historia clinica, API de WhatsApp; la misma linea atiende a IDEI, un instituto de entrenamiento en implantologia) y llenas la ficha del prospecto. Usa solo lo que dice la conversacion; no inventes.',
       tools: [FICHA_TOOL], tool_choice: { type: 'tool', name: 'ficha' },
       messages: [{ role: 'user', content: guion.slice(-6000) }]
     })
@@ -352,7 +355,7 @@ async function sacarFicha(KEY, messages, reply) {
 module.exports = async (req, res) => {
   // Diagnostico: /api/webhook?diag=1 dice si los manuales estan cargados (solo tamanos).
   if (req.method === 'GET' && req.query && req.query.diag) {
-    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY, firma_twilio_exigida: (await C.kvGet('klivox_firma_vista')) === '1', escribiendo_ultimo: await C.kvGet('klivox_typing_ultimo'), menu_ultima_falla: await C.kvGet('klivox_menu_falla') });
+    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, manual_idei: MANUAL_IDEI.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY, firma_twilio_exigida: (await C.kvGet('klivox_firma_vista')) === '1', escribiendo_ultimo: await C.kvGet('klivox_typing_ultimo'), menu_ultima_falla: await C.kvGet('klivox_menu_falla') });
   }
   const p = req.body || {};
   const from = p.From || '';
@@ -501,7 +504,7 @@ module.exports = async (req, res) => {
       try {
         const agendaOn = !!(process.env.AGENDA_URL && process.env.AGENDA_CLAVE);
         // El bloque fijo (conocimiento + manuales) va en cache; la agenda cambia con la hora y va aparte.
-        const system = [{ type: 'text', text: SYSTEM_PROMPT + SOPORTE, cache_control: { type: 'ephemeral' } }];
+        const system = [{ type: 'text', text: SYSTEM_PROMPT + SOPORTE + IDEI, cache_control: { type: 'ephemeral' } }];
         if (agendaOn) system.push({ type: 'text', text: agendaPrompt().trim() });
 
         // Una pasada completa con el modelo: hasta 4 vueltas para consultar horarios y agendar.

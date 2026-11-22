@@ -38,6 +38,7 @@ function descarte(lead, ahora) {
   if (lead.antiguo) return 'contacto_anterior';
   if (lead.cliente) return 'es_cliente';
   if (lead.noSeguir) return 'pidio_no_contactar';
+  if (lead.interes === 'idei') return 'es_de_idei'; // las plantillas de seguimiento hablan de Klivox
   if (lead.llamada) return 'tiene_llamada';
   const hechos = lead.seguimientos || [];
   if (hechos.length >= 2) return 'ya_recibio_dos';
