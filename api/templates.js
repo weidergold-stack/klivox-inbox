@@ -27,6 +27,13 @@ module.exports = async (req, res) => {
           actions: [{ title: 'Confirmo', id: 'confirmo' }, { title: 'Cambiar hora', id: 'cambiar' }, { title: 'Cancelar', id: 'cancelar' }]
         } }
       },
+      clinify_boton: {
+        nombre: 'klivox_clinify_prueba_boton', categoria: 'MARKETING', variables: { 1: 'Weider' },
+        types: { 'twilio/call-to-action': {
+          body: 'Hola {{1}} 🦷 Tu prueba gratis de 14 días de Clinify te espera: historia clínica, agenda, RIPS y facturación electrónica en un solo lugar. Sin tarjeta.',
+          actions: [{ type: 'URL', title: 'Crear mi cuenta gratis', url: 'https://historiaclinify.com' }]
+        } }
+      },
       despues_llamada: {
         nombre: 'klivox_despues_llamada', categoria: 'UTILITY', variables: { 1: 'Weider' },
         types: { 'twilio/text': { body: 'Hola {{1}} 👋 Gracias por tu interés en Klivox. ¿Cómo te fue en la llamada con nuestro asesor? Si te quedó alguna duda o quieres avanzar, respóndenos por aquí.' } }

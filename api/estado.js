@@ -29,6 +29,16 @@ module.exports = async (req, res) => {
       const nuevo = await C.kvCmd(['SET', 'klivox_falla:' + sid, '1', 'EX', 86400, 'NX']);
       if (nuevo === null && process.env.KV_REST_API_URL) return done();
     }
+    // Si lo que no se entrego era un menu, se manda enseguida el mismo contenido como texto.
+    if (sid) {
+      const resp = await C.kvGet('klivox_menu_respaldo:' + sid);
+      if (resp) {
+        await C.kvCmd(['DEL', 'klivox_menu_respaldo:' + sid]);
+        try { const m = JSON.parse(resp); await C.enviarWhatsApp({ to: m.to, body: m.texto + C.BOT_MARK }); } catch (_) {}
+        await C.kvSet('klivox_menu_falla', String(p.ErrorCode || 'sin_codigo') + ' ' + new Date().toISOString(), 604800);
+        return done();
+      }
+    }
     const codigo = String(p.ErrorCode || '');
     const lead = p.To ? await C.leerLead(p.To) : null;
     // No se avisa por Telegram (el equipo pidio solo dos tipos de aviso). La falla queda

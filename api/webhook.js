@@ -55,6 +55,7 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Solo ofrecemos lo que esta en este texto. Si piden otro servicio, di con amabilidad que no esta en nuestro portafolio actual y que un asesor puede revisar su caso.
 - Ante urgencias, quejas o temas complejos: no inventes datos; traslada a un asesor con calidez, avisa que le contactara muy pronto y pide su nombre y en que ayudarle.
 - Puedes ver las imagenes que te envian y leer las notas de voz, que te llegan ya transcritas entre corchetes. Responde a su contenido con naturalidad, sin mencionar la transcripcion ni los corchetes. Si es una captura de un error, usala para ayudar. No hagas diagnosticos clinicos a partir de fotos.
+- Cuando la persona deba elegir entre opciones concretas (que producto le interesa, o los horarios de llamada), usa la herramienta enviar_menu para que toque la opcion en vez de escribirla. No la uses para respuestas normales ni para preguntas abiertas.
 - No uses formato Markdown ni asteriscos para negritas; WhatsApp no los interpreta. Escribe en texto plano y natural.
 - Nunca prometas cosas que no sabes.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia la llamada o hacia el registro de la prueba.`;
@@ -279,6 +280,34 @@ async function kvSet(key, value, segundos) {
 }
 
 // ============================================================================
+// MENU DE OPCIONES: el modelo lo pide con esta herramienta y el codigo lo envia como
+// lista de WhatsApp (ver enviarMenu en lib/comun.js). Si no se puede, sale como texto.
+// ============================================================================
+const MENU_TOOL = {
+  name: 'enviar_menu',
+  description: 'Envia a la persona un menu de WhatsApp para que toque una opcion. Usalo cuando deba elegir entre 2 y 6 opciones concretas. Al usarla, este menu ES tu respuesta: no escribas nada mas.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      texto: { type: 'string', description: 'Mensaje que acompana al menu, corto y natural. Sin saltos de linea.' },
+      boton: { type: 'string', description: 'Texto del boton que abre el menu, maximo 20 caracteres. Ej: Ver horarios.' },
+      opciones: {
+        type: 'array', minItems: 2, maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            titulo: { type: 'string', description: 'Maximo 24 caracteres. Para horarios usa formato corto, ej: Mar 24 · 7:30 p. m.' },
+            descripcion: { type: 'string', description: 'Detalle de la opcion, maximo 72 caracteres. Para horarios, la etiqueta completa.' }
+          },
+          required: ['titulo', 'descripcion']
+        }
+      }
+    },
+    required: ['texto', 'boton', 'opciones']
+  }
+};
+
+// ============================================================================
 // FICHA DEL PROSPECTO: despues de responder, una consulta corta al modelo resume
 // quien es la persona, que le interesa y si necesita a un asesor. Con eso se llena
 // el registro de prospectos y se decide a quien avisar y a quien hacerle seguimiento.
@@ -323,11 +352,12 @@ async function sacarFicha(KEY, messages, reply) {
 module.exports = async (req, res) => {
   // Diagnostico: /api/webhook?diag=1 dice si los manuales estan cargados (solo tamanos).
   if (req.method === 'GET' && req.query && req.query.diag) {
-    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY, firma_twilio_exigida: (await C.kvGet('klivox_firma_vista')) === '1' });
+    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY, firma_twilio_exigida: (await C.kvGet('klivox_firma_vista')) === '1', escribiendo_ultimo: await C.kvGet('klivox_typing_ultimo'), menu_ultima_falla: await C.kvGet('klivox_menu_falla') });
   }
   const p = req.body || {};
   const from = p.From || '';
-  const body = (p.Body || '').trim();
+  // Al tocar una opcion de un menu o un boton, el texto elegido llega en Body (o en ListTitle / ButtonText).
+  const body = String(p.Body || p.ListTitle || p.ButtonText || '').trim();
 
   res.setHeader('Content-Type', 'text/xml');
   const done = () => res.status(200).send('<Response></Response>');
@@ -417,6 +447,9 @@ module.exports = async (req, res) => {
     });
     if (recentHumanOutbound) return done();
 
+    // El bot va a responder: muestra "escribiendo…" mientras piensa.
+    await C.escribiendo(String(p.MessageSid || p.SmsMessageSid || ''));
+
     // Adjuntos del mensaje que acaba de entrar.
     const sidMsg = String(p.MessageSid || p.SmsMessageSid || '');
     const adj = await leerAdjuntos(p, auth);
@@ -462,6 +495,7 @@ module.exports = async (req, res) => {
 
     const eventos = [];      // lo que la agenda confirmo en este turno (agendada, cambiada, cancelada)
     let falloAgenda = false; // el bot no logro registrar algo en la agenda
+    let menuEnviado = false; // la respuesta ya salio como menu de WhatsApp
     let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
     if (KEY) {
       try {
@@ -474,10 +508,11 @@ module.exports = async (req, res) => {
         // Devuelve el texto final y si la llamada quedo DE VERDAD en la agenda.
         const pedir = async (convo) => {
           let txt = '';
+          let menu = null;
           let agendada = false, cambiada = false, cancelada = false;
           for (let i = 0; i < 4; i++) {
             const reqBody = { model: MODEL, max_tokens: 500, system, messages: convo };
-            if (agendaOn) reqBody.tools = AGENDA_TOOLS;
+            reqBody.tools = [MENU_TOOL].concat(agendaOn ? AGENDA_TOOLS : []);
             const ar = await fetch('https://api.anthropic.com/v1/messages', {
               method: 'POST',
               headers: {
@@ -494,6 +529,9 @@ module.exports = async (req, res) => {
               txt = blocks.filter(b => b.type === 'text').map(b => b.text).join(NL).trim();
               break;
             }
+            // El menu es la respuesta final del turno: se envia abajo, fuera de este ciclo.
+            const um = uses.find(u => u.name === 'enviar_menu');
+            if (um) { menu = um.input || {}; txt = String(menu.texto || ''); break; }
             convo.push({ role: 'assistant', content: blocks });
             const results = [];
             for (const u of uses) {
@@ -512,7 +550,7 @@ module.exports = async (req, res) => {
             }
             convo.push({ role: 'user', content: results });
           }
-          return { txt, agendada, cambiada, cancelada };
+          return { txt, menu, agendada, cambiada, cancelada };
         };
 
         let r = await pedir(messages.slice());
@@ -545,22 +583,28 @@ module.exports = async (req, res) => {
             convo2.push({ role: 'user', content: f1.nota });
             r = await pedir(convo2);
             const f2 = falta(r);
-            if (f2) { r.txt = f2.fallo; falloAgenda = true; }
+            if (f2) { r.txt = f2.fallo; r.menu = null; falloAgenda = true; }
           }
         }
 
-        if (r.txt) reply = r.txt;
+        if (r.menu) {
+          const env = await C.enviarMenu(from, r.menu);
+          reply = C.menuComoTexto(r.menu); // texto equivalente: sirve de respaldo y para la ficha
+          if (env.ok) { menuEnviado = true; lead.enviados = (lead.enviados || []).concat(env.sid).slice(-20); }
+        } else if (r.txt) reply = r.txt;
       } catch (_) { /* usa el mensaje de respaldo */ }
     }
 
     // Limpiar Markdown que WhatsApp no interpreta y enviar por Twilio REST
     reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
-    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK, StatusCallback: C.BASE_PUBLICA + '/api/estado' });
-    await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
-      method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: sendBody.toString()
-    });
+    if (!menuEnviado) {
+      const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK, StatusCallback: C.BASE_PUBLICA + '/api/estado' });
+      await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: sendBody.toString()
+      });
+    }
 
     // ---- Despues de responder: ficha del prospecto y avisos al equipo ----
     try {

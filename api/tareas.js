@@ -28,7 +28,7 @@ function plantillaPara(lead) {
   if (hechos === 0) return lead.interes === 'clinify' ? 'klivox_recordatorio_clinify' : 'klivox_reenganche_general';
   if (hechos === 1) {
     if (lead.asesor) return 'klivox_seguimiento_asesoria';
-    if (lead.seguimientos[0].plantilla === 'klivox_recordatorio_clinify') return 'klivox_reenganche_general';
+    if (/clinify/.test(lead.seguimientos[0].plantilla)) return 'klivox_reenganche_general';
   }
   return '';
 }
@@ -72,7 +72,10 @@ module.exports = async (req, res) => {
 
     for (const lead of candidatos) {
       if (hechos.length >= MAX_POR_PASADA) break;
-      const nombrePl = plantillaPara(lead);
+      let nombrePl = plantillaPara(lead);
+      // Para Clinify se prefiere la version con boton "Crear mi cuenta gratis", si Meta ya la aprobo.
+      const conBoton = 'klivox_clinify_prueba_boton';
+      if (nombrePl === 'klivox_recordatorio_clinify' && pl[conBoton] && pl[conBoton].aprobada) nombrePl = conBoton;
       const sid = pl[nombrePl] && pl[nombrePl].aprobada ? pl[nombrePl].sid : '';
       if (!sid) { saltados.push({ tel: lead.tel, motivo: 'plantilla_no_aprobada' }); continue; }
 
