@@ -293,7 +293,7 @@ const FICHA_TOOL = {
       negocio: { type: 'string', description: 'Tipo de negocio o consultorio si lo dijo; si no, cadena vacia.' },
       interes: { type: 'string', enum: ['crm', 'clinify', 'api_whatsapp', 'otro', 'ninguno'] },
       es_cliente: { type: 'boolean', description: 'true si ya usa uno de nuestros productos y pide soporte.' },
-      necesita_persona: { type: 'boolean', description: 'true solo si el bot le dijo que un asesor lo contactara o confirmara algo, o si la persona pide hablar con una persona, o hay queja, cobro o urgencia.' },
+      necesita_persona: { type: 'boolean', description: 'true solo si el bot le dijo que un asesor le escribira o confirmara algo que quedo pendiente, o si la persona pide hablar con una persona, o hay queja, cobro o urgencia. Una llamada que ya quedo agendada, cambiada o cancelada en la agenda NO cuenta: eso es false.' },
       motivo_persona: { type: 'string', description: 'Por que necesita a una persona, en pocas palabras; si no aplica, cadena vacia.' },
       no_contactar: { type: 'boolean', description: 'true si la persona pidio que no le escriban mas.' },
       resumen: { type: 'string', description: 'Resumen de 1 o 2 frases de lo que quiere y en que quedo.' }
@@ -591,7 +591,7 @@ module.exports = async (req, res) => {
       if (falloAgenda) {
         await C.avisar('⚠️ El bot no pudo registrar un cambio en la agenda y le dijo que un asesor lo confirma. Revisar y escribirle.' + NL + C.fichaTexto(lead));
         lead.asesor = { ts: Date.now(), motivo: 'Fallo de agenda' };
-      } else if (ficha && ficha.necesita_persona && (!lead.asesor || Date.now() - lead.asesor.ts > 6 * 3600000)) {
+      } else if (ficha && ficha.necesita_persona && !eventos.length && (!lead.asesor || Date.now() - lead.asesor.ts > 6 * 3600000)) {
         lead.asesor = { ts: Date.now(), motivo: String(ficha.motivo_persona || '').slice(0, 160) };
         await C.avisar('🙋 Necesita a un asesor' + (lead.asesor.motivo ? ': ' + lead.asesor.motivo : '') + NL + C.fichaTexto(lead) + NL + 'Abrir: ' + C.BASE_PUBLICA);
       }

@@ -90,6 +90,23 @@ module.exports = async (req, res) => {
       const entro = ult.find(m => (m.direction || '').startsWith('inbound'));
       if (entro && (ahora - new Date(entro.date_sent || entro.date_created || 0).getTime()) < 24 * H) { saltados.push({ tel: lead.tel, motivo: 'escribio_hace_poco' }); continue; }
 
+      // La agenda manda: si ya tiene una llamada agendada (aunque la ficha no lo sepa), no se le escribe.
+      if (process.env.AGENDA_URL && process.env.AGENDA_CLAVE) {
+        try {
+          const ar = await fetch(process.env.AGENDA_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accion: 'disponibilidad', telefono: lead.tel, clave: process.env.AGENDA_CLAVE })
+          });
+          const ad = await ar.json();
+          if (ad && ad.llamada_actual) {
+            lead.llamada = ad.llamada_actual;
+            await C.guardarLead(lead);
+            saltados.push({ tel: lead.tel, motivo: 'tiene_llamada_en_la_agenda' });
+            continue;
+          }
+        } catch (_) {}
+      }
+
       const nombre = C.nombreCorto(lead) || 'qué tal';
       if (simular) { hechos.push({ tel: lead.tel, plantilla: nombrePl, nombre }); continue; }
 
