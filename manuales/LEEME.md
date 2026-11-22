@@ -6,4 +6,4 @@ Manuales orientados al cliente, redactados a partir del código y de las página
 - `klivox.md`: CRM Klivox, agente de IA y API de WhatsApp.
 - `sonrisaspass.md`: SonrisasPass. Es para pacientes del consultorio; NO se carga en el bot de Klivox.
 
-Todavía no están conectados al bot: `api/webhook.js` no los lee.
+`api/webhook.js` carga `clinify.md` y `klivox.md` y se los entrega al bot. Para corregir lo que el bot sabe, se edita el manual.

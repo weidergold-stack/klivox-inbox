@@ -4,7 +4,7 @@ Fuente: código de la aplicación (repositorio `historiaclinify`, versión del 2
 
 ## 1. Qué es
 
-Clinify es un software en la nube para clínicas y consultorios odontológicos: historia clínica digital, odontograma, plan de tratamiento, agenda, consentimientos con firma, fórmulas y documentos, cajas, inventario, reportes, RIPS, facturación electrónica y nómina electrónica. Está en español y no se instala nada: funciona en el navegador (Chrome, Edge, Safari o Firefox) en computador, tablet o celular.
+Clinify es un software en la nube para clínicas y consultorios odontológicos: historia clínica digital, odontograma, plan de tratamiento, agenda, consentimientos con firma, fórmulas y documentos, cajas, inventario, reportes, RIPS, facturación electrónica y nómina electrónica para los trabajadores de la clínica. Está en español y no se instala nada: funciona en el navegador (Chrome, Edge, Safari o Firefox) en computador, tablet o celular.
 
 ## 2. Registro y prueba gratis
 

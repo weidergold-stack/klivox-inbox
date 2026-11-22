@@ -84,6 +84,31 @@ async function notifyTelegram(fromNum, text) {
 // hace cumplir el script del calendario, no el modelo.
 // ============================================================================
 const NL = String.fromCharCode(10);
+
+// ============================================================================
+// MANUALES DE SOPORTE: se leen de la carpeta manuales/ y se le entregan al modelo.
+// Para corregir lo que el bot sabe de un producto se edita el manual, no este archivo.
+// sonrisaspass.md NO se carga: es para pacientes del consultorio, no para este numero.
+// ============================================================================
+const fs = require('fs');
+const path = require('path');
+function leerManual(nombre) {
+  try { return fs.readFileSync(path.join(__dirname, '..', 'manuales', nombre), 'utf8'); } catch (_) { return ''; }
+}
+const MANUAL_CLINIFY = leerManual('clinify.md');
+const MANUAL_KLIVOX = leerManual('klivox.md');
+const SOPORTE = (MANUAL_CLINIFY || MANUAL_KLIVOX) ? NL + NL + [
+  '## Soporte a clientes (usa los manuales de abajo)',
+  'Este numero tambien da soporte a quienes ya usan nuestros productos.',
+  '- Si la persona pregunta como hacer algo o tiene un problema, responde con lo que dicen los manuales: pasos concretos y en orden, en mensajes cortos. Si son muchos pasos, da los primeros y pregunta si pudo.',
+  '- Si la respuesta no esta en los manuales, no la inventes: dilo con naturalidad y pasa el caso a un asesor, pidiendo el correo de su cuenta y que describa el problema.',
+  '- Pasa siempre a un asesor los casos que cada manual lista en la seccion de cuando pasar a una persona (cobros, perdida de datos, bloqueos de linea, etc.).',
+  '- Nunca pidas ni recibas contrasenas, numeros de tarjeta ni llaves. Si las envian, pide que no lo hagan.',
+  '- No expliques como esta construido el sistema por dentro; solo como se usa.',
+  '- Para vender sigue las reglas de arriba; los manuales te sirven tambien para responder dudas antes de comprar.',
+  MANUAL_CLINIFY ? NL + '===== MANUAL: CLINIFY =====' + NL + MANUAL_CLINIFY : '',
+  MANUAL_KLIVOX ? NL + '===== MANUAL: KLIVOX =====' + NL + MANUAL_KLIVOX : ''
+].join(NL) : '';
 // Frases con las que el bot afirma que una llamada quedo agendada.
 const DICE_AGENDADA = /(te agendo|te agend[eé]|agendad[ao]|qued[oó] (programad|confirmad|reservad)|nos vemos el)/i;
 const DICE_CAMBIADA = /(reprogramad[ao]|reagendad[ao]|cambiad[ao]|te la cambi[eé]|te la pas[eé]|qued[oó] para el)/i;
@@ -171,6 +196,10 @@ async function agendaCall(name, input, phone) {
 }
 
 module.exports = async (req, res) => {
+  // Diagnostico: /api/webhook?diag=1 dice si los manuales estan cargados (solo tamanos).
+  if (req.method === 'GET' && req.query && req.query.diag) {
+    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length });
+  }
   const p = req.body || {};
   const from = p.From || '';
   const body = (p.Body || '').trim();
@@ -261,7 +290,9 @@ module.exports = async (req, res) => {
     if (KEY) {
       try {
         const agendaOn = !!(process.env.AGENDA_URL && process.env.AGENDA_CLAVE);
-        const system = agendaOn ? SYSTEM_PROMPT + agendaPrompt() : SYSTEM_PROMPT;
+        // El bloque fijo (conocimiento + manuales) va en cache; la agenda cambia con la hora y va aparte.
+        const system = [{ type: 'text', text: SYSTEM_PROMPT + SOPORTE, cache_control: { type: 'ephemeral' } }];
+        if (agendaOn) system.push({ type: 'text', text: agendaPrompt().trim() });
 
         // Una pasada completa con el modelo: hasta 4 vueltas para consultar horarios y agendar.
         // Devuelve el texto final y si la llamada quedo DE VERDAD en la agenda.
