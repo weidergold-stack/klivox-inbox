@@ -112,7 +112,7 @@ function agendaPrompt() {
     '## Agenda de llamadas (tienes herramientas)',
     'Esta seccion reemplaza la instruccion de no confirmar una hora: ahora la llamada la agendas tu.',
     'Hoy es ' + hoy + ' (hora de Colombia).',
-    '- Cuando la persona quiera la llamada, usa ver_horarios_disponibles y ofrecele 3 opciones numeradas, en dias u horas distintas. Usa las etiquetas tal como las devuelve la herramienta. Nunca inventes horarios.',
+    '- Cuando la persona quiera la llamada, usa ver_horarios_disponibles y ofrecele siempre exactamente 2 opciones numeradas, en 2 dias distintos (nunca dos horas del mismo dia). Si ninguna le sirve, ofrece otras 2 en dias distintos. Usa las etiquetas tal como las devuelve la herramienta. Nunca inventes horarios.',
     '- Para agendar necesitas su nombre y su tipo de negocio. Si faltan, pidelos en el mismo mensaje en que ofreces las opciones.',
     '- Cuando elija una opcion, vuelve a usar ver_horarios_disponibles para tomar el valor inicio exacto de esa opcion y enseguida usa agendar_llamada.',
     '- Si pide un dia u hora que no esta en la lista, dile que ese no esta disponible y ofrece las opciones mas cercanas de la lista.',
