@@ -86,12 +86,17 @@ async function notifyTelegram(fromNum, text) {
 const NL = String.fromCharCode(10);
 // Frases con las que el bot afirma que una llamada quedo agendada.
 const DICE_AGENDADA = /(te agendo|te agend[eé]|agendad[ao]|qued[oó] (programad|confirmad|reservad)|nos vemos el)/i;
+const DICE_CAMBIADA = /(reprogramad[ao]|reagendad[ao]|cambiad[ao]|te la cambi[eé]|te la pas[eé]|qued[oó] para el)/i;
+const DICE_CANCELADA = /(cancelad[ao]|te la cancel[eé]|cancel[eé] tu|he cancelado)/i;
 const NOTA_AGENDA = '[Nota interna del sistema, no la escribio el cliente] La llamada todavia NO esta creada en la agenda. Si la persona ya eligio un horario, usa ver_horarios_disponibles y luego agendar_llamada AHORA, y confirma solo si responde ok true. Si aun no ha elegido horario, responde sin decir que quedo agendada.';
+const NOTA_CAMBIO = '[Nota interna del sistema, no la escribio el cliente] La llamada todavia NO se ha cambiado en la agenda. Si la persona ya eligio el nuevo horario, usa ver_horarios_disponibles y luego reprogramar_llamada AHORA, y confirma solo si responde ok true. Si aun no ha elegido, ofrece las opciones sin decir que quedo cambiada.';
+const NOTA_CANCELA = '[Nota interna del sistema, no la escribio el cliente] La llamada todavia NO esta cancelada en la agenda. Si la persona pidio cancelarla, usa cancelar_llamada AHORA y confirma solo si responde ok true. Si no lo pidio, no digas que quedo cancelada.';
 const FALLO_AGENDA = 'Tuve un inconveniente para registrar tu llamada en la agenda 🙏 Un asesor te escribe en un momento para confirmarte el horario.';
+const FALLO_CAMBIO = 'Tuve un inconveniente para hacer ese cambio en la agenda 🙏 Un asesor te escribe en un momento para confirmarlo.';
 const AGENDA_TOOLS = [
   {
     name: 'ver_horarios_disponibles',
-    description: 'Consulta en la agenda real los horarios libres para una llamada con un asesor de Klivox. Devuelve opciones, cada una con inicio (valor exacto para agendar) y etiqueta (texto para mostrar a la persona).',
+    description: 'Consulta en la agenda real los horarios libres para una llamada con un asesor de Klivox. Devuelve opciones, cada una con inicio (valor exacto para agendar o reprogramar) y etiqueta (texto para mostrar a la persona). Tambien devuelve llamada_actual: la llamada que esta persona ya tiene agendada, o null si no tiene.',
     input_schema: { type: 'object', properties: {} }
   },
   {
@@ -107,6 +112,22 @@ const AGENDA_TOOLS = [
       },
       required: ['inicio', 'nombre']
     }
+  },
+  {
+    name: 'reprogramar_llamada',
+    description: 'Cambia de horario la llamada que esta persona ya tiene agendada. Usala cuando pida cambiarla o moverla y ya haya elegido una de las opciones devueltas por ver_horarios_disponibles.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        inicio: { type: 'string', description: 'Valor inicio exacto del nuevo horario, tal como lo devolvio ver_horarios_disponibles.' }
+      },
+      required: ['inicio']
+    }
+  },
+  {
+    name: 'cancelar_llamada',
+    description: 'Cancela la llamada que esta persona tiene agendada. Usala cuando pida cancelarla.',
+    input_schema: { type: 'object', properties: {} }
   }
 ];
 
@@ -121,15 +142,22 @@ function agendaPrompt() {
     '- Cuando elija una opcion, vuelve a usar ver_horarios_disponibles para tomar el valor inicio exacto de esa opcion y enseguida usa agendar_llamada.',
     '- Cuando la persona diga el dia y la hora que prefiere: si coincide con una opcion de la lista de ver_horarios_disponibles, agendala; si no coincide, no agendes ni ofrezcas otras opciones: agradece, repite el horario que pidio y avisale que en un momento un asesor le confirma.',
     '- Confirma la llamada solo si agendar_llamada responde ok true, repitiendo dia y hora. Si responde ocupado, ofrece las nuevas opciones. Si responde ya_tiene_cita, recuerdale la llamada que ya tiene. Si hay un error, di que un asesor lo contactara para coordinarla.',
+    '- Si la persona pide CAMBIAR su llamada: usa ver_horarios_disponibles (llamada_actual te dice la que tiene), ofrece 2 opciones en dias distintos y, cuando elija, usa reprogramar_llamada con el inicio exacto. Di que quedo cambiada solo si responde ok true. Si responde sin_cita, dile que no tiene una llamada agendada y ofrece agendar una.',
+    '- Si la persona pide CANCELAR su llamada: usa cancelar_llamada de inmediato, sin insistir ni pedir motivos. Di que quedo cancelada solo si responde ok true. Si responde sin_cita, dile que no tiene una llamada agendada.',
+    '- Si agendar_llamada responde ya_tiene_cita y la persona quiere otro horario, usa reprogramar_llamada en lugar de agendar otra.',
     '- La llamada la hace un asesor de Klivox al mismo numero de WhatsApp desde el que escribe.'
   ].join(NL);
 }
 
 async function agendaCall(name, input, phone) {
   try {
-    const payload = name === 'agendar_llamada'
-      ? { accion: 'agendar', inicio: input.inicio, nombre: input.nombre, negocio: input.negocio, interes: input.interes, telefono: phone }
-      : { accion: 'disponibilidad' };
+    let payload;
+    if (name === 'agendar_llamada') payload = { accion: 'agendar', inicio: input.inicio, nombre: input.nombre, negocio: input.negocio, interes: input.interes };
+    else if (name === 'reprogramar_llamada') payload = { accion: 'reprogramar', inicio: input.inicio };
+    else if (name === 'cancelar_llamada') payload = { accion: 'cancelar' };
+    else payload = { accion: 'disponibilidad' };
+    // El telefono lo pone el servidor, nunca el modelo: asi nadie cambia la llamada de otro.
+    payload.telefono = phone;
     payload.clave = process.env.AGENDA_CLAVE;
     const r = await fetch(process.env.AGENDA_URL, {
       method: 'POST',
@@ -238,7 +266,7 @@ module.exports = async (req, res) => {
         // Devuelve el texto final y si la llamada quedo DE VERDAD en la agenda.
         const pedir = async (convo) => {
           let txt = '';
-          let agendada = false;
+          let agendada = false, cambiada = false, cancelada = false;
           for (let i = 0; i < 4; i++) {
             const reqBody = { model: MODEL, max_tokens: 500, system, messages: convo };
             if (agendaOn) reqBody.tools = AGENDA_TOOLS;
@@ -264,23 +292,47 @@ module.exports = async (req, res) => {
               const out = await agendaCall(u.name, u.input || {}, patientNum);
               // Cuenta como agendada si se acaba de crear o si la agenda confirma que ya existe.
               if (u.name === 'agendar_llamada' && out && (out.ok === true || out.motivo === 'ya_tiene_cita')) agendada = true;
+              if (u.name === 'reprogramar_llamada' && out && out.ok === true) { cambiada = true; agendada = true; }
+              if (u.name === 'cancelar_llamada' && out && (out.ok === true || out.motivo === 'sin_cita')) cancelada = true;
               results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
             }
             convo.push({ role: 'user', content: results });
           }
-          return { txt, agendada };
+          return { txt, agendada, cambiada, cancelada };
         };
 
         let r = await pedir(messages.slice());
 
-        // CANDADO: el bot no puede decir que agendo si la agenda no lo confirmo.
-        // Si lo dice sin haber creado la llamada, se le exige crearla; si aun asi no
-        // queda creada, se envia un mensaje honesto y lo confirma un asesor.
-        if (agendaOn && !r.agendada && DICE_AGENDADA.test(r.txt)) {
-          const convo2 = messages.slice();
-          convo2.push({ role: 'user', content: NOTA_AGENDA });
-          r = await pedir(convo2);
-          if (!r.agendada && DICE_AGENDADA.test(r.txt)) r.txt = FALLO_AGENDA;
+        // CANDADO: el bot no puede afirmar que agendo, cambio o cancelo una llamada si la
+        // agenda no lo confirmo en este mismo turno. Si lo afirma sin haberlo hecho, se le
+        // exige hacerlo; si aun asi no queda hecho, sale un mensaje honesto y confirma un asesor.
+        const falta = (x) => {
+          if (!agendaOn) return null;
+          if (!x.cancelada && DICE_CANCELADA.test(x.txt)) return { tipo: 'cancelada', nota: NOTA_CANCELA, fallo: FALLO_CAMBIO };
+          if (x.cancelada) return null; // hablar de la llamada que se acaba de cancelar es correcto
+          if (x.agendada) return null;  // se creo, se movio o la agenda confirmo que existe
+          if (DICE_CAMBIADA.test(x.txt)) return { tipo: 'cambiada', nota: NOTA_CAMBIO, fallo: FALLO_CAMBIO };
+          if (DICE_AGENDADA.test(x.txt)) return { tipo: 'agendada', nota: NOTA_AGENDA, fallo: FALLO_AGENDA };
+          return null;
+        };
+        const f1 = falta(r);
+        if (f1) {
+          // Antes de corregir al modelo se mira la agenda: puede estar diciendo algo cierto
+          // que viene de un turno anterior (por ejemplo, recordar una llamada ya agendada).
+          const est = await agendaCall('ver_horarios_disponibles', {}, patientNum);
+          const actual = est && est.llamada_actual ? String(est.llamada_actual) : '';
+          const dia = actual.split(' ')[0];
+          const dicho = r.txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const yaEsVerdad =
+            (f1.tipo === 'agendada' && !!dia && dicho.includes(dia)) ||
+            (f1.tipo === 'cancelada' && !!est && !est.error && !actual);
+          if (!yaEsVerdad) {
+            const convo2 = messages.slice();
+            convo2.push({ role: 'user', content: f1.nota });
+            r = await pedir(convo2);
+            const f2 = falta(r);
+            if (f2) r.txt = f2.fallo;
+          }
         }
 
         if (r.txt) reply = r.txt;
