@@ -76,6 +76,68 @@ async function notifyTelegram(fromNum, text) {
   } catch (_) {}
 }
 
+// ============================================================================
+// AGENDA DE LLAMADAS (Google Calendar, via el script "Agenda Klivox").
+// Solo se activa si existen las variables AGENDA_URL y AGENDA_CLAVE en Vercel.
+// Sin ellas el bot se comporta como antes: pide dia y hora y avisa a un asesor.
+// Las reglas duras (horario valido, sin choques, una llamada por numero) las
+// hace cumplir el script del calendario, no el modelo.
+// ============================================================================
+const NL = String.fromCharCode(10);
+const AGENDA_TOOLS = [
+  {
+    name: 'ver_horarios_disponibles',
+    description: 'Consulta en la agenda real los horarios libres para una llamada con un asesor de Klivox. Devuelve opciones, cada una con inicio (valor exacto para agendar) y etiqueta (texto para mostrar a la persona).',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'agendar_llamada',
+    description: 'Crea la llamada en la agenda. Usala solo cuando la persona ya eligio una de las opciones devueltas por ver_horarios_disponibles y ya tienes su nombre.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        inicio: { type: 'string', description: 'Valor inicio exacto de la opcion elegida, tal como lo devolvio ver_horarios_disponibles.' },
+        nombre: { type: 'string', description: 'Nombre de la persona.' },
+        negocio: { type: 'string', description: 'Tipo de negocio o consultorio.' },
+        interes: { type: 'string', description: 'Producto o servicio que le interesa.' }
+      },
+      required: ['inicio', 'nombre']
+    }
+  }
+];
+
+function agendaPrompt() {
+  const hoy = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return NL + NL + [
+    '## Agenda de llamadas (tienes herramientas)',
+    'Esta seccion reemplaza la instruccion de no confirmar una hora: ahora la llamada la agendas tu.',
+    'Hoy es ' + hoy + ' (hora de Colombia).',
+    '- Cuando la persona quiera la llamada, usa ver_horarios_disponibles y ofrecele 3 opciones numeradas, en dias u horas distintas. Usa las etiquetas tal como las devuelve la herramienta. Nunca inventes horarios.',
+    '- Para agendar necesitas su nombre y su tipo de negocio. Si faltan, pidelos en el mismo mensaje en que ofreces las opciones.',
+    '- Cuando elija una opcion, vuelve a usar ver_horarios_disponibles para tomar el valor inicio exacto de esa opcion y enseguida usa agendar_llamada.',
+    '- Si pide un dia u hora que no esta en la lista, dile que ese no esta disponible y ofrece las opciones mas cercanas de la lista.',
+    '- Confirma la llamada solo si agendar_llamada responde ok true, repitiendo dia y hora. Si responde ocupado, ofrece las nuevas opciones. Si responde ya_tiene_cita, recuerdale la llamada que ya tiene. Si hay un error, di que un asesor lo contactara para coordinarla.',
+    '- La llamada la hace un asesor de Klivox al mismo numero de WhatsApp desde el que escribe.'
+  ].join(NL);
+}
+
+async function agendaCall(name, input, phone) {
+  try {
+    const payload = name === 'agendar_llamada'
+      ? { accion: 'agendar', inicio: input.inicio, nombre: input.nombre, negocio: input.negocio, interes: input.interes, telefono: phone }
+      : { accion: 'disponibilidad' };
+    payload.clave = process.env.AGENDA_CLAVE;
+    const r = await fetch(process.env.AGENDA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return await r.json();
+  } catch (e) {
+    return { error: 'agenda_no_disponible' };
+  }
+}
+
 module.exports = async (req, res) => {
   const p = req.body || {};
   const from = p.From || '';
@@ -165,18 +227,38 @@ module.exports = async (req, res) => {
     let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
     if (KEY) {
       try {
-        const ar = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({ model: MODEL, max_tokens: 400, system: SYSTEM_PROMPT, messages })
-        });
-        const ad = await ar.json();
-        const txt = ad && ad.content && ad.content[0] && ad.content[0].text;
-        if (txt) reply = txt.trim();
+        const agendaOn = !!(process.env.AGENDA_URL && process.env.AGENDA_CLAVE);
+        const system = agendaOn ? SYSTEM_PROMPT + agendaPrompt() : SYSTEM_PROMPT;
+        const convo = messages.slice();
+        // Hasta 4 vueltas: el modelo puede consultar horarios y agendar antes de responder.
+        for (let i = 0; i < 4; i++) {
+          const reqBody = { model: MODEL, max_tokens: 500, system, messages: convo };
+          if (agendaOn) reqBody.tools = AGENDA_TOOLS;
+          const ar = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-api-key': KEY,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify(reqBody)
+          });
+          const ad = await ar.json();
+          const blocks = (ad && ad.content) || [];
+          const uses = blocks.filter(b => b.type === 'tool_use');
+          if (ad.stop_reason !== 'tool_use' || !uses.length) {
+            const txt = blocks.filter(b => b.type === 'text').map(b => b.text).join(NL).trim();
+            if (txt) reply = txt;
+            break;
+          }
+          convo.push({ role: 'assistant', content: blocks });
+          const results = [];
+          for (const u of uses) {
+            const out = await agendaCall(u.name, u.input || {}, patientNum);
+            results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
+          }
+          convo.push({ role: 'user', content: results });
+        }
       } catch (_) { /* usa el mensaje de respaldo */ }
     }
 
