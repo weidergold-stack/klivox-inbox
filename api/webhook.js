@@ -54,6 +54,7 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Si es un saludo o el primer mensaje, presentate en 1-2 lineas y pregunta en que puede ayudar. No repitas el saludo si ya saludaste antes.
 - Solo ofrecemos lo que esta en este texto. Si piden otro servicio, di con amabilidad que no esta en nuestro portafolio actual y que un asesor puede revisar su caso.
 - Ante urgencias, quejas o temas complejos: no inventes datos; traslada a un asesor con calidez, avisa que le contactara muy pronto y pide su nombre y en que ayudarle.
+- Puedes ver las imagenes que te envian y leer las notas de voz, que te llegan ya transcritas entre corchetes. Responde a su contenido con naturalidad, sin mencionar la transcripcion ni los corchetes. Si es una captura de un error, usala para ayudar. No hagas diagnosticos clinicos a partir de fotos.
 - No uses formato Markdown ni asteriscos para negritas; WhatsApp no los interpreta. Escribe en texto plano y natural.
 - Nunca prometas cosas que no sabes.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia la llamada o hacia el registro de la prueba.`;
@@ -195,10 +196,98 @@ async function agendaCall(name, input, phone) {
   }
 }
 
+// ============================================================================
+// ADJUNTOS: fotos y notas de voz que envia la persona.
+//  - Imagenes: se le pasan al modelo, que las puede ver.
+//  - Notas de voz: se transcriben (Groq Whisper u otro servicio compatible con OpenAI).
+//    Requiere TRANSCRIPCION_API_KEY en Vercel; sin ella el bot avisa que no pudo escucharla.
+//  - Lo que se entendio de cada adjunto se guarda 7 dias en Redis, para que el bot
+//    siga sabiendo que dijo el audio en los mensajes siguientes.
+// ============================================================================
+const TOPE_IMAGEN = 3.5 * 1024 * 1024;
+const TOPE_AUDIO = 20 * 1024 * 1024;
+
+async function bajar(url, auth, tope) {
+  const r = await fetch(url, { headers: { Authorization: auth } });
+  if (!r.ok) return null;
+  const buf = Buffer.from(await r.arrayBuffer());
+  return buf.length && buf.length <= tope ? buf : null;
+}
+
+async function transcribir(url, auth, tipo) {
+  const key = process.env.TRANSCRIPCION_API_KEY;
+  if (!key) return '';
+  const buf = await bajar(url, auth, TOPE_AUDIO);
+  if (!buf) return '';
+  const ext = tipo.includes('mpeg') ? 'mp3' : tipo.includes('mp4') ? 'm4a' : tipo.includes('wav') ? 'wav' : tipo.includes('amr') ? 'amr' : 'ogg';
+  const form = new FormData();
+  form.append('file', new Blob([buf], { type: tipo }), 'audio.' + ext);
+  form.append('model', process.env.TRANSCRIPCION_MODELO || 'whisper-large-v3-turbo');
+  form.append('response_format', 'json');
+  if (process.env.TRANSCRIPCION_IDIOMA) form.append('language', process.env.TRANSCRIPCION_IDIOMA);
+  const r = await fetch(process.env.TRANSCRIPCION_URL || 'https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + key }, body: form
+  });
+  if (!r.ok) return '';
+  const d = await r.json();
+  return String((d && d.text) || '').trim().slice(0, 2000);
+}
+
+async function leerAdjuntos(p, auth) {
+  const notas = [], imagenes = [];
+  const n = Math.min(Number(p.NumMedia || 0) || 0, 4);
+  for (let i = 0; i < n; i++) {
+    const url = p['MediaUrl' + i];
+    const tipo = String(p['MediaContentType' + i] || '').toLowerCase().split(';')[0].trim();
+    if (!url) continue;
+    try {
+      if (/^image[/](jpeg|png|webp|gif)$/.test(tipo)) {
+        if (imagenes.length >= 3) continue;
+        const buf = await bajar(url, auth, TOPE_IMAGEN);
+        if (!buf) { notas.push('[La persona envio una imagen que no se pudo abrir. Pidele que la reenvie o que describa lo que muestra.]'); continue; }
+        imagenes.push({ type: 'image', source: { type: 'base64', media_type: tipo, data: buf.toString('base64') } });
+        notas.push('[La persona envio una imagen]');
+      } else if (tipo.indexOf('audio/') === 0) {
+        const txt = await transcribir(url, auth, tipo);
+        notas.push(txt
+          ? '[Nota de voz, transcrita]: ' + txt
+          : '[La persona envio una nota de voz que no pudiste escuchar. Dile con amabilidad que por ahora no pudiste escuchar ese audio y pidele que te lo escriba.]');
+      } else {
+        notas.push('[La persona envio un archivo (' + (tipo || 'desconocido') + ') que no puedes abrir. Dile que no puedes abrirlo y pidele que te cuente por escrito que necesita.]');
+      }
+    } catch (_) {
+      notas.push('[La persona envio un adjunto que no se pudo leer. Pidele que te lo escriba.]');
+    }
+  }
+  return { notas, imagenes };
+}
+
+// Memoria corta en Redis (Upstash). Si no esta configurado, no hace nada.
+async function kvGet(key) {
+  const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
+  if (!KU || !KT) return null;
+  try {
+    const r = await fetch(KU + '/get/' + encodeURIComponent(key), { headers: { Authorization: 'Bearer ' + KT } });
+    const d = await r.json();
+    return d && typeof d.result === 'string' ? d.result : null;
+  } catch (_) { return null; }
+}
+async function kvSet(key, value, segundos) {
+  const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
+  if (!KU || !KT) return;
+  try {
+    await fetch(KU, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + KT, 'Content-Type': 'application/json' },
+      body: JSON.stringify(['SET', key, value, 'EX', segundos])
+    });
+  } catch (_) {}
+}
+
 module.exports = async (req, res) => {
   // Diagnostico: /api/webhook?diag=1 dice si los manuales estan cargados (solo tamanos).
   if (req.method === 'GET' && req.query && req.query.diag) {
-    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length });
+    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY });
   }
   const p = req.body || {};
   const from = p.From || '';
@@ -263,28 +352,48 @@ module.exports = async (req, res) => {
     });
     if (recentHumanOutbound) return done();
 
+    // Adjuntos del mensaje que acaba de entrar.
+    const sidMsg = String(p.MessageSid || p.SmsMessageSid || '');
+    const adj = await leerAdjuntos(p, auth);
+    if (sidMsg && adj.notas.length) await kvSet('klivox_adj:' + sidMsg, adj.notas.join(NL), 604800);
+
+    // Adjuntos de mensajes anteriores: se recupera lo que se entendio de cada uno.
+    const previos = {};
+    await Promise.all(msgs
+      .filter(m => m.sid !== sidMsg && (m.direction || '').startsWith('inbound') && !(m.body || '').trim() && Number(m.num_media) > 0)
+      .slice(0, 8)
+      .map(async m => { const v = await kvGet('klivox_adj:' + m.sid); if (v) previos[m.sid] = v; }));
+
     let hist = msgs
+      .filter(m => !sidMsg || m.sid !== sidMsg) // el mensaje actual se agrega abajo, con sus adjuntos
       .map(m => ({
         role: (m.direction || '').startsWith('inbound') ? 'user' : 'assistant',
-        text: (m.body || '').replace(BOT_MARK, '').trim(),
+        text: (m.body || '').replace(BOT_MARK, '').trim() || previos[m.sid] || '',
         t: m.date_created ? new Date(m.date_created).getTime() : 0
       }))
       .filter(m => m.text)
       .sort((a, b) => a.t - b.t)
       .slice(-HISTORY_MAX);
 
-    if (body && (!hist.length || hist[hist.length - 1].text !== body)) {
-      hist.push({ role: 'user', text: body, t: now });
+    const actual = [body].concat(adj.notas).filter(Boolean).join(NL);
+    if (actual && (sidMsg || !hist.length || hist[hist.length - 1].text !== actual)) {
+      hist.push({ role: 'user', text: actual, t: now });
     }
 
     const messages = [];
     for (const m of hist) {
       const last = messages[messages.length - 1];
-      if (last && last.role === m.role) last.content += '\n' + m.text;
+      if (last && last.role === m.role) last.content += NL + m.text;
       else messages.push({ role: m.role, content: m.text });
     }
     while (messages.length && messages[0].role !== 'user') messages.shift();
-    if (!messages.length) messages.push({ role: 'user', content: body || 'Hola' });
+    if (!messages.length) messages.push({ role: 'user', content: actual || 'Hola' });
+
+    // Las imagenes van pegadas al ultimo mensaje de la persona, para que el modelo las vea.
+    if (adj.imagenes.length) {
+      const ult = messages[messages.length - 1];
+      if (ult.role === 'user') ult.content = [{ type: 'text', text: String(ult.content) }].concat(adj.imagenes);
+    }
 
     let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
     if (KEY) {
