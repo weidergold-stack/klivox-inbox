@@ -10,6 +10,52 @@ module.exports = async (req, res) => {
   if (!SID || !TOKEN) { res.status(200).json({ templates: [], error: 'Faltan credenciales' }); return; }
   const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
 
+  // POST { crear: 'recordatorio_llamada' } -> crea la plantilla del recordatorio de la
+  // llamada y la envia a aprobacion de WhatsApp. Solo crea ESA plantilla, con texto fijo;
+  // no acepta texto libre. Si ya existe, no la duplica: devuelve su estado.
+  if (req.method === 'POST') {
+    let b = req.body || {};
+    if (typeof b === 'string') { try { b = JSON.parse(b); } catch (_) { b = {}; } }
+    if (b.crear !== 'recordatorio_llamada') { res.status(400).json({ ok: false, error: 'plantilla_desconocida' }); return; }
+    const NOMBRE = 'klivox_recordatorio_llamada';
+    const jh = { Authorization: auth, 'Content-Type': 'application/json' };
+    try {
+      const lr = await fetch('https://content.twilio.com/v1/ContentAndApprovals?PageSize=100', { headers: { Authorization: auth } });
+      const ld = await lr.json();
+      let c = (ld.contents || []).find(x => x.friendly_name === NOMBRE);
+      let creada = false;
+      if (!c) {
+        const cr = await fetch('https://content.twilio.com/v1/Content', {
+          method: 'POST', headers: jh,
+          body: JSON.stringify({
+            friendly_name: NOMBRE,
+            language: 'es',
+            variables: { 1: 'Weider', 2: '7:30 p. m.' },
+            types: { 'twilio/text': { body: 'Hola {{1}} 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las {{2}}. Te llamaremos a este mismo número. Si necesitas cambiarla o cancelarla, respóndenos por aquí.' } }
+          })
+        });
+        c = await cr.json();
+        if (!cr.ok || !c.sid) { res.status(200).json({ ok: false, paso: 'crear', detalle: String(c.message || cr.status).slice(0, 300) }); return; }
+        creada = true;
+      }
+      const estado = String(((c.approval_requests || {}).status) || 'unsubmitted').toLowerCase();
+      let enviada = false, detalle = '';
+      if (creada || estado === 'unsubmitted') {
+        const ar = await fetch('https://content.twilio.com/v1/Content/' + c.sid + '/ApprovalRequests/whatsapp', {
+          method: 'POST', headers: jh,
+          body: JSON.stringify({ name: NOMBRE, category: 'UTILITY' })
+        });
+        const ad = await ar.json().catch(() => ({}));
+        enviada = ar.ok;
+        detalle = String(ad.status || ad.message || ar.status).slice(0, 300);
+      }
+      res.status(200).json({ ok: true, creada, enviada_a_aprobacion: enviada, estado_anterior: creada ? 'no_existia' : estado, detalle });
+    } catch (e) {
+      res.status(200).json({ ok: false, error: String((e && e.message) || e).slice(0, 300) });
+    }
+    return;
+  }
+
   try {
     const url = 'https://content.twilio.com/v1/ContentAndApprovals?PageSize=100';
     const r = await fetch(url, { headers: { Authorization: auth } });
