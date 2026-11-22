@@ -1,6 +1,13 @@
 // api/bot-state.js — interruptor de pausa del bot en Redis (Upstash)
 // Sin 'number' => interruptor GLOBAL (klivox_bot_paused).
-// Con 'number' => interruptor por conversacion (klivox_paused:<number>).
+// Con 'number' => interruptor por conversacion (klivox_paused:<ultimos 10 digitos del numero>).
+// Regla: lo que se elige en un chat manda sobre el global.
+//        Un chat sin eleccion propia sigue al interruptor global.
+// OJO: api/webhook.js usa la misma llave y la misma regla. Si cambias una, cambia la otra.
+const GLOBAL_KEY = 'klivox_bot_paused';
+const digits = (num) => String(num || '').replace(/\D/g, '');
+const chatKey = (num) => 'klivox_paused:' + digits(num).slice(-10);
+
 module.exports = async (req, res) => {
   const pass = req.headers['x-inbox-pass'] || '';
   if (!process.env.INBOX_PASSWORD || pass !== process.env.INBOX_PASSWORD) {
@@ -9,20 +16,30 @@ module.exports = async (req, res) => {
   const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
   if (!KU || !KT) return res.status(500).json({ error: 'kv_no_config' });
   const H = { Authorization: `Bearer ${KT}` };
-  const keyFor = (num) => num ? ('klivox_paused:' + String(num)) : 'klivox_bot_paused';
   try {
     if (req.method === 'POST') {
-      const b = req.body || {};
-      const key = keyFor(b.number);
+      let b = req.body || {};
+      if (typeof b === 'string') { try { b = JSON.parse(b); } catch (_) { b = {}; } }
+      const hasNum = !!digits(b.number);
+      const key = hasNum ? chatKey(b.number) : GLOBAL_KEY;
       const val = b.paused ? '1' : '0';
-      await fetch(`${KU}/set/${encodeURIComponent(key)}/${val}`, { method: 'POST', headers: H });
-      return res.status(200).json({ ok: true, number: b.number || null, paused: val === '1' });
+      const w = await fetch(`${KU}/set/${encodeURIComponent(key)}/${val}`, { method: 'POST', headers: H });
+      if (!w.ok) return res.status(502).json({ error: 'kv_write_failed' });
+      return res.status(200).json({ ok: true, number: hasNum ? b.number : null, paused: val === '1' });
     }
     const num = (req.query && req.query.number) || '';
-    const key = keyFor(num);
-    const r = await fetch(`${KU}/get/${encodeURIComponent(key)}`, { headers: H });
+    if (!digits(num)) {
+      const r = await fetch(`${KU}/get/${GLOBAL_KEY}`, { headers: H });
+      const d = await r.json();
+      return res.status(200).json({ number: null, paused: !!d && d.result === '1' });
+    }
+    // Estado EFECTIVO del chat: su propia eleccion, o la global si no tiene.
+    const r = await fetch(`${KU}/mget/${encodeURIComponent(chatKey(num))}/${GLOBAL_KEY}`, { headers: H });
     const d = await r.json();
-    return res.status(200).json({ number: num || null, paused: d && d.result === '1' });
+    const v = (d && d.result) || [];
+    const own = v[0] === '1' || v[0] === '0';
+    const paused = own ? v[0] === '1' : v[1] === '1';
+    return res.status(200).json({ number: num, paused, own });
   } catch (e) {
     return res.status(500).json({ error: String((e && e.message) || e) });
   }
