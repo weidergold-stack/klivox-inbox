@@ -23,7 +23,7 @@ En Klivox unimos tecnologia e inteligencia artificial para que consultorios y ne
 ## Que ofrecemos (3 productos principales y otros servicios)
 1. CRM Klivox — US$ 97 al mes. Responde automaticamente los mensajes y agenda citas las 24 horas, como una recepcionista que nunca descansa. Sirve para odontologia y para cualquier negocio que reciba muchos mensajes y trabaje con agenda. Mas informacion en klivox.co. Para empezar se agenda una llamada donde definimos los requisitos del cliente.
 2. Clinify (historiaclinify.com) — software de historia clinica para odontologia. Incluye RIPS, facturacion electronica y nomina electronica, y cumple con la ultima resolucion vigente en Colombia. Tiene 14 dias de prueba gratis: la persona se registra ella misma en historiaclinify.com y empieza de inmediato, sin llamada. El precio depende del numero de usuarios clinicos y esta publicado en la web.
-3. API de WhatsApp — US$ 29 al mes. Conecta el numero del negocio a la API oficial de WhatsApp para evitar los bloqueos. Se activa en 1 dia. Para empezar se agenda una llamada donde definimos los requisitos del cliente.
+3. API de WhatsApp — US$ 29 al mes. Conecta el numero del negocio a la API oficial de WhatsApp para evitar los bloqueos. Normalmente se activa en 1 dia. Para empezar se agenda una llamada donde definimos los requisitos del cliente.
 
 Otros servicios que tambien ofrecemos:
 4. Agencia de marketing: manejo de redes sociales, contenido y estrategia para atraer y fidelizar pacientes o clientes.
@@ -84,6 +84,10 @@ async function notifyTelegram(fromNum, text) {
 // hace cumplir el script del calendario, no el modelo.
 // ============================================================================
 const NL = String.fromCharCode(10);
+// Frases con las que el bot afirma que una llamada quedo agendada.
+const DICE_AGENDADA = /(te agendo|te agend[eé]|agendad[ao]|qued[oó] (programad|confirmad|reservad)|nos vemos el)/i;
+const NOTA_AGENDA = '[Nota interna del sistema, no la escribio el cliente] La llamada todavia NO esta creada en la agenda. Si la persona ya eligio un horario, usa ver_horarios_disponibles y luego agendar_llamada AHORA, y confirma solo si responde ok true. Si aun no ha elegido horario, responde sin decir que quedo agendada.';
+const FALLO_AGENDA = 'Tuve un inconveniente para registrar tu llamada en la agenda 🙏 Un asesor te escribe en un momento para confirmarte el horario.';
 const AGENDA_TOOLS = [
   {
     name: 'ver_horarios_disponibles',
@@ -229,36 +233,57 @@ module.exports = async (req, res) => {
       try {
         const agendaOn = !!(process.env.AGENDA_URL && process.env.AGENDA_CLAVE);
         const system = agendaOn ? SYSTEM_PROMPT + agendaPrompt() : SYSTEM_PROMPT;
-        const convo = messages.slice();
-        // Hasta 4 vueltas: el modelo puede consultar horarios y agendar antes de responder.
-        for (let i = 0; i < 4; i++) {
-          const reqBody = { model: MODEL, max_tokens: 500, system, messages: convo };
-          if (agendaOn) reqBody.tools = AGENDA_TOOLS;
-          const ar = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              'x-api-key': KEY,
-              'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify(reqBody)
-          });
-          const ad = await ar.json();
-          const blocks = (ad && ad.content) || [];
-          const uses = blocks.filter(b => b.type === 'tool_use');
-          if (ad.stop_reason !== 'tool_use' || !uses.length) {
-            const txt = blocks.filter(b => b.type === 'text').map(b => b.text).join(NL).trim();
-            if (txt) reply = txt;
-            break;
+
+        // Una pasada completa con el modelo: hasta 4 vueltas para consultar horarios y agendar.
+        // Devuelve el texto final y si la llamada quedo DE VERDAD en la agenda.
+        const pedir = async (convo) => {
+          let txt = '';
+          let agendada = false;
+          for (let i = 0; i < 4; i++) {
+            const reqBody = { model: MODEL, max_tokens: 500, system, messages: convo };
+            if (agendaOn) reqBody.tools = AGENDA_TOOLS;
+            const ar = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                'x-api-key': KEY,
+                'anthropic-version': '2023-06-01'
+              },
+              body: JSON.stringify(reqBody)
+            });
+            const ad = await ar.json();
+            const blocks = (ad && ad.content) || [];
+            const uses = blocks.filter(b => b.type === 'tool_use');
+            if (ad.stop_reason !== 'tool_use' || !uses.length) {
+              txt = blocks.filter(b => b.type === 'text').map(b => b.text).join(NL).trim();
+              break;
+            }
+            convo.push({ role: 'assistant', content: blocks });
+            const results = [];
+            for (const u of uses) {
+              const out = await agendaCall(u.name, u.input || {}, patientNum);
+              // Cuenta como agendada si se acaba de crear o si la agenda confirma que ya existe.
+              if (u.name === 'agendar_llamada' && out && (out.ok === true || out.motivo === 'ya_tiene_cita')) agendada = true;
+              results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
+            }
+            convo.push({ role: 'user', content: results });
           }
-          convo.push({ role: 'assistant', content: blocks });
-          const results = [];
-          for (const u of uses) {
-            const out = await agendaCall(u.name, u.input || {}, patientNum);
-            results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
-          }
-          convo.push({ role: 'user', content: results });
+          return { txt, agendada };
+        };
+
+        let r = await pedir(messages.slice());
+
+        // CANDADO: el bot no puede decir que agendo si la agenda no lo confirmo.
+        // Si lo dice sin haber creado la llamada, se le exige crearla; si aun asi no
+        // queda creada, se envia un mensaje honesto y lo confirma un asesor.
+        if (agendaOn && !r.agendada && DICE_AGENDADA.test(r.txt)) {
+          const convo2 = messages.slice();
+          convo2.push({ role: 'user', content: NOTA_AGENDA });
+          r = await pedir(convo2);
+          if (!r.agendada && DICE_AGENDADA.test(r.txt)) r.txt = FALLO_AGENDA;
         }
+
+        if (r.txt) reply = r.txt;
       } catch (_) { /* usa el mensaje de respaldo */ }
     }
 
