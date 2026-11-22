@@ -91,6 +91,7 @@ const NL = String.fromCharCode(10);
 // Para corregir lo que el bot sabe de un producto se edita el manual, no este archivo.
 // sonrisaspass.md NO se carga: es para pacientes del consultorio, no para este numero.
 // ============================================================================
+const C = require('../lib/comun');
 const fs = require('fs');
 const path = require('path');
 function leerManual(nombre) {
@@ -171,6 +172,7 @@ function agendaPrompt() {
     '- Si la persona pide CAMBIAR su llamada: usa ver_horarios_disponibles (llamada_actual te dice la que tiene), ofrece 2 opciones en dias distintos y, cuando elija, usa reprogramar_llamada con el inicio exacto. Di que quedo cambiada solo si responde ok true. Si responde sin_cita, dile que no tiene una llamada agendada y ofrece agendar una.',
     '- Si la persona pide CANCELAR su llamada: usa cancelar_llamada de inmediato, sin insistir ni pedir motivos. Di que quedo cancelada solo si responde ok true. Si responde sin_cita, dile que no tiene una llamada agendada.',
     '- Si agendar_llamada responde ya_tiene_cita y la persona quiere otro horario, usa reprogramar_llamada en lugar de agendar otra.',
+    '- El recordatorio de la llamada trae botones. Si la persona responde Confirmo, agradece y confirma que la llamaremos a esa hora, sin usar herramientas. Si responde Cambiar hora, sigue el flujo de CAMBIAR. Si responde Cancelar, sigue el flujo de CANCELAR.',
     '- La llamada la hace un asesor de Klivox al mismo numero de WhatsApp desde el que escribe.'
   ].join(NL);
 }
@@ -284,10 +286,52 @@ async function kvSet(key, value, segundos) {
   } catch (_) {}
 }
 
+// ============================================================================
+// FICHA DEL PROSPECTO: despues de responder, una consulta corta al modelo resume
+// quien es la persona, que le interesa y si necesita a un asesor. Con eso se llena
+// el registro de prospectos y se decide a quien avisar y a quien hacerle seguimiento.
+// ============================================================================
+const FICHA_TOOL = {
+  name: 'ficha',
+  description: 'Registra la ficha del prospecto segun la conversacion.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      nombre: { type: 'string', description: 'Nombre de la persona si lo dijo; si no, cadena vacia.' },
+      negocio: { type: 'string', description: 'Tipo de negocio o consultorio si lo dijo; si no, cadena vacia.' },
+      interes: { type: 'string', enum: ['crm', 'clinify', 'api_whatsapp', 'otro', 'ninguno'] },
+      es_cliente: { type: 'boolean', description: 'true si ya usa uno de nuestros productos y pide soporte.' },
+      necesita_persona: { type: 'boolean', description: 'true solo si el bot le dijo que un asesor lo contactara o confirmara algo, o si la persona pide hablar con una persona, o hay queja, cobro o urgencia.' },
+      motivo_persona: { type: 'string', description: 'Por que necesita a una persona, en pocas palabras; si no aplica, cadena vacia.' },
+      no_contactar: { type: 'boolean', description: 'true si la persona pidio que no le escriban mas.' },
+      resumen: { type: 'string', description: 'Resumen de 1 o 2 frases de lo que quiere y en que quedo.' }
+    },
+    required: ['nombre', 'negocio', 'interes', 'es_cliente', 'necesita_persona', 'motivo_persona', 'no_contactar', 'resumen']
+  }
+};
+
+async function sacarFicha(KEY, messages, reply) {
+  const texto = (c) => Array.isArray(c) ? c.filter(x => x.type === 'text').map(x => x.text).join(NL) : String(c || '');
+  const guion = messages.slice(-12).map(m => (m.role === 'user' ? 'Cliente: ' : 'Bot: ') + texto(m.content)).join(NL) + NL + 'Bot: ' + reply;
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: MODEL, max_tokens: 350,
+      system: 'Lees conversaciones de WhatsApp entre un cliente y el bot de Klivox (CRM con IA, Clinify historia clinica, API de WhatsApp) y llenas la ficha del prospecto. Usa solo lo que dice la conversacion; no inventes.',
+      tools: [FICHA_TOOL], tool_choice: { type: 'tool', name: 'ficha' },
+      messages: [{ role: 'user', content: guion.slice(-6000) }]
+    })
+  });
+  const d = await r.json();
+  const u = ((d && d.content) || []).find(b => b.type === 'tool_use');
+  return u ? u.input : null;
+}
+
 module.exports = async (req, res) => {
   // Diagnostico: /api/webhook?diag=1 dice si los manuales estan cargados (solo tamanos).
   if (req.method === 'GET' && req.query && req.query.diag) {
-    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY });
+    return res.status(200).json({ manual_clinify: MANUAL_CLINIFY.length, manual_klivox: MANUAL_KLIVOX.length, transcripcion_de_audios: !!process.env.TRANSCRIPCION_API_KEY, firma_twilio_exigida: (await C.kvGet('klivox_firma_vista')) === '1' });
   }
   const p = req.body || {};
   const from = p.From || '';
@@ -299,8 +343,30 @@ module.exports = async (req, res) => {
   try {
     if (!from.startsWith('whatsapp:')) return done();
 
+    // Seguridad: solo se atiende a Twilio. Ver revisarFirma en lib/comun.js.
+    const firma = await C.revisarFirma(req);
+    if (!firma.permitir) return res.status(403).send('<Response></Response>');
+
+    // Registro de prospectos: una ficha por numero. Se actualiza aunque el bot este en pausa.
+    const t0 = Date.now();
+    let lead = await C.leerLead(from);
+    const esNuevo = !lead;
+    if (!lead) lead = { tel: from.replace('whatsapp:', ''), primer: t0, mensajes: 0, seguimientos: [], enviados: [] };
+    lead.ultimoIn = t0;
+    lead.mensajes = (lead.mensajes || 0) + 1;
+    if (p.ProfileName) lead.perfil = String(p.ProfileName).slice(0, 60);
+    // Si llego desde un anuncio de clic a WhatsApp, Twilio entrega el titular y el enlace.
+    if (!lead.anuncio && (p.ReferralHeadline || p.ReferralSourceUrl)) {
+      lead.anuncio = {
+        titulo: String(p.ReferralHeadline || p.ReferralBody || '').slice(0, 160),
+        url: String(p.ReferralSourceUrl || '').slice(0, 300),
+        tipo: String(p.ReferralSourceType || '').slice(0, 30)
+      };
+    }
+    await C.guardarLead(lead);
+
     // Aviso a Telegram (si esta configurado)
-    await notifyTelegram(from.replace('whatsapp:', ''), body);
+    await notifyTelegram(from.replace('whatsapp:', ''), (esNuevo && lead.anuncio && lead.anuncio.titulo ? '[Llego por el anuncio: ' + lead.anuncio.titulo + '] ' : '') + body);
 
     // Interruptor de pausa (Redis/Upstash).
     // Regla (la misma de api/bot-state.js): lo que se elige en un chat manda sobre el global;
@@ -341,11 +407,16 @@ module.exports = async (req, res) => {
     } catch (_) { msgs = []; }
 
     const now = Date.now();
+    // Un contacto que ya tenia historia antes de hoy no es prospecto nuevo: no se le hace seguimiento automatico.
+    if (esNuevo && msgs.some(m => (now - new Date(m.date_sent || m.date_created || now).getTime()) > 24 * 3600000)) {
+      lead.antiguo = true;
+      await C.guardarLead(lead);
+    }
     const windowMs = HUMAN_WINDOW_MIN * 60 * 1000;
     const recentHumanOutbound = msgs.some(m => {
       const isOut = (m.direction || '').startsWith('outbound');
       // El recordatorio por plantilla no lleva la marca invisible: se reconoce por su texto.
-      const isBot = (m.body || '').includes(BOT_MARK) || (m.body || '').includes('Te recordamos tu llamada con un asesor de Klivox');
+      const isBot = (m.body || '').includes(BOT_MARK) || (m.body || '').includes('Te recordamos tu llamada con un asesor de Klivox') || (lead.enviados || []).includes(m.sid);
       const ts = m.date_sent || m.date_created;
       const t = ts ? new Date(ts).getTime() : 0;
       return isOut && !isBot && (now - t) < windowMs;
@@ -395,6 +466,8 @@ module.exports = async (req, res) => {
       if (ult.role === 'user') ult.content = [{ type: 'text', text: String(ult.content) }].concat(adj.imagenes);
     }
 
+    const eventos = [];      // lo que la agenda confirmo en este turno (agendada, cambiada, cancelada)
+    let falloAgenda = false; // el bot no logro registrar algo en la agenda
     let reply = 'Gracias por escribir a Klivox 😊 En breve un asesor te atendera. ¿Me cuentas tu nombre y que necesitas?';
     if (KEY) {
       try {
@@ -435,6 +508,12 @@ module.exports = async (req, res) => {
               if (u.name === 'agendar_llamada' && out && (out.ok === true || out.motivo === 'ya_tiene_cita')) agendada = true;
               if (u.name === 'reprogramar_llamada' && out && out.ok === true) { cambiada = true; agendada = true; }
               if (u.name === 'cancelar_llamada' && out && (out.ok === true || out.motivo === 'sin_cita')) cancelada = true;
+              if (out && out.ok === true) {
+                if (u.name === 'agendar_llamada') eventos.push({ tipo: 'agendada', etiqueta: out.etiqueta });
+                if (u.name === 'reprogramar_llamada') eventos.push({ tipo: 'cambiada', etiqueta: out.etiqueta, anterior: out.anterior });
+                if (u.name === 'cancelar_llamada') eventos.push({ tipo: 'cancelada', etiqueta: out.cancelada });
+              }
+              if (u.name === 'ver_horarios_disponibles' && out && !out.error && 'llamada_actual' in out) lead.llamada = out.llamada_actual || null;
               results.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(out) });
             }
             convo.push({ role: 'user', content: results });
@@ -472,7 +551,7 @@ module.exports = async (req, res) => {
             convo2.push({ role: 'user', content: f1.nota });
             r = await pedir(convo2);
             const f2 = falta(r);
-            if (f2) r.txt = f2.fallo;
+            if (f2) { r.txt = f2.fallo; falloAgenda = true; }
           }
         }
 
@@ -482,12 +561,48 @@ module.exports = async (req, res) => {
 
     // Limpiar Markdown que WhatsApp no interpreta y enviar por Twilio REST
     reply = reply.replace(/\*\*/g, '').replace(/__/g, '').trim();
-    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK });
+    const sendBody = new URLSearchParams({ From: FROM, To: from, Body: reply + BOT_MARK, StatusCallback: C.BASE_PUBLICA + '/api/estado' });
     await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
       method: 'POST',
       headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: sendBody.toString()
     });
+
+    // ---- Despues de responder: ficha del prospecto y avisos al equipo ----
+    try {
+      lead.ultimoOut = Date.now();
+      for (const ev of eventos) {
+        lead.llamada = ev.tipo === 'cancelada' ? null : ev.etiqueta;
+        lead.confirmo = null;
+      }
+      const confirmo = /^confirmo[.!]?$/i.test(body) && !!lead.llamada;
+      if (confirmo) lead.confirmo = Date.now();
+
+      let ficha = null;
+      if (KEY) { try { ficha = await sacarFicha(KEY, messages, reply); } catch (_) { ficha = null; } }
+      if (ficha) {
+        if (ficha.nombre) lead.nombre = String(ficha.nombre).slice(0, 80);
+        if (ficha.negocio) lead.negocio = String(ficha.negocio).slice(0, 120);
+        if (ficha.interes && (ficha.interes !== 'ninguno' || !lead.interes)) lead.interes = ficha.interes;
+        if (ficha.es_cliente) lead.cliente = true;
+        if (ficha.no_contactar) lead.noSeguir = true;
+        if (ficha.resumen) lead.resumen = String(ficha.resumen).slice(0, 400);
+      }
+
+      const TIT = { agendada: '📅 Llamada agendada', cambiada: '🔁 Llamada cambiada', cancelada: '❌ Llamada cancelada' };
+      for (const ev of eventos) {
+        await C.avisar(TIT[ev.tipo] + ': ' + (ev.etiqueta || '') + (ev.anterior ? ' (antes: ' + ev.anterior + ')' : '') + NL + C.fichaTexto(lead));
+      }
+      if (confirmo) await C.avisar('✅ Confirmó su llamada: ' + lead.llamada + NL + C.fichaTexto(lead));
+      if (falloAgenda) {
+        await C.avisar('⚠️ El bot no pudo registrar un cambio en la agenda y le dijo que un asesor lo confirma. Revisar y escribirle.' + NL + C.fichaTexto(lead));
+        lead.asesor = { ts: Date.now(), motivo: 'Fallo de agenda' };
+      } else if (ficha && ficha.necesita_persona && (!lead.asesor || Date.now() - lead.asesor.ts > 6 * 3600000)) {
+        lead.asesor = { ts: Date.now(), motivo: String(ficha.motivo_persona || '').slice(0, 160) };
+        await C.avisar('🙋 Necesita a un asesor' + (lead.asesor.motivo ? ': ' + lead.asesor.motivo : '') + NL + C.fichaTexto(lead) + NL + 'Abrir: ' + C.BASE_PUBLICA);
+      }
+      await C.guardarLead(lead);
+    } catch (_) {}
 
     return done();
   } catch (e) {

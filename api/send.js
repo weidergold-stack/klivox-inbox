@@ -21,7 +21,8 @@ module.exports = async (req, res) => {
   if (!to.startsWith('whatsapp:')) to = 'whatsapp:' + to;
 
   const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
-  const params = new URLSearchParams({ From: FROM, To: to });
+  // StatusCallback: Twilio avisa a /api/estado si el mensaje no se entrega.
+  const params = new URLSearchParams({ From: FROM, To: to, StatusCallback: 'https://klivox-inbox.vercel.app/api/estado' });
 
   if (contentSid) {
     // Envío por plantilla aprobada (permite reabrir conversaciones fuera de 24h)

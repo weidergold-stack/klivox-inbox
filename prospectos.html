@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Klivox · Prospectos</title>
+<style>
+  :root{--bg:#04060d;--panel:#0b1120;--linea:#1b2540;--txt:#e9eefa;--mut:#8a98b8;--cy:#22d3ee}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--linea)}
+  h1{font-size:18px;margin:0}
+  a{color:var(--cy);text-decoration:none}
+  .res{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+  .chip{background:var(--panel);border:1px solid var(--linea);border-radius:999px;padding:5px 12px;color:var(--mut);cursor:pointer}
+  .chip b{color:var(--txt)}
+  .chip.on{border-color:var(--cy);color:var(--txt)}
+  main{padding:16px 20px}
+  input[type=search]{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--linea);border-radius:8px;padding:9px 12px;color:var(--txt);margin-bottom:14px}
+  .wrap{overflow-x:auto;border:1px solid var(--linea);border-radius:10px}
+  table{border-collapse:collapse;width:100%;min-width:980px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--linea);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;background:var(--panel);position:sticky;top:0}
+  tr:last-child td{border-bottom:none}
+  .mut{color:var(--mut);font-size:12px}
+  .et{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+  .Nuevo{background:#1e293b;color:#cbd5e1}.Interesado{background:#0c4a6e;color:#7dd3fc}
+  .Llamada{background:#14532d;color:#86efac}.Espera{background:#713f12;color:#fde68a}.Cliente{background:#3b0764;color:#d8b4fe}
+  .vacio{padding:40px;text-align:center;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Prospectos</h1>
+  <a href="/">← Volver a la bandeja</a>
+  <div class="res" id="res"></div>
+</header>
+<main>
+  <input type="search" id="q" placeholder="Buscar por nombre, número, negocio o anuncio…">
+  <div class="wrap"><table>
+    <thead><tr><th>Prospecto</th><th>Negocio</th><th>Interés</th><th>Etapa</th><th>Llegó por</th><th>Último mensaje</th><th>Seguimiento</th><th>Resumen</th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table></div>
+  <div class="vacio" id="vacio" hidden></div>
+</main>
+<script>
+// La clave es la misma de la bandeja: se entra primero por la bandeja y queda guardada en este navegador.
+const PASS = localStorage.getItem('kv_pass') || '';
+const SEG = {
+  le_toca: 'Le toca mensaje', contacto_anterior: 'No: contacto anterior', es_cliente: 'No: es cliente',
+  pidio_no_contactar: 'No: pidió no ser contactado', tiene_llamada: 'No: tiene llamada', ya_recibio_dos: 'Completo (2 enviados)',
+  sin_interes_claro: 'No: sin interés claro', el_bot_no_le_respondio: 'No: el bot no le respondió',
+  escribio_hace_menos_de_24h: 'Aún no: escribió hace menos de 24 h', respondio_al_primero: 'No: ya respondió',
+  faltan_72h_desde_el_primero: 'Aún no: faltan 72 h', sin_plantilla_que_aplique: 'No: sin plantilla que aplique'
+};
+let datos = [], filtro = '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cuando = t => t ? new Date(t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+function pintar() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const lista = datos.filter(p => (!filtro || p.etapa === filtro) &&
+    (!q || [p.nombre, p.tel, p.negocio, p.anuncio, p.interes, p.resumen].join(' ').toLowerCase().includes(q)));
+  document.getElementById('tb').innerHTML = lista.map(p => '<tr>' +
+    '<td><b>' + esc(p.nombre || 'Sin nombre') + '</b><div class="mut">' + esc(p.tel) + ' · ' + p.mensajes + ' mensajes</div></td>' +
+    '<td>' + esc(p.negocio) + '</td>' +
+    '<td>' + esc(p.interes) + '</td>' +
+    '<td><span class="et ' + esc(p.etapa.split(' ')[0]) + '">' + esc(p.etapa) + '</span>' +
+      (p.llamada ? '<div class="mut">' + esc(p.llamada) + (p.confirmo ? ' · confirmó' : '') + '</div>' : '') + '</td>' +
+    '<td>' + (p.anuncio ? esc(p.anuncio) : '<span class="mut">Directo</span>') + '</td>' +
+    '<td>' + esc(cuando(p.ultimo)) + '<div class="mut">Primer contacto: ' + esc(cuando(p.primer)) + '</div></td>' +
+    '<td>' + esc(SEG[p.seguimiento] || p.seguimiento) + '<div class="mut">Enviados: ' + p.seguimientos + ' de 2</div></td>' +
+    '<td class="mut" style="max-width:320px">' + esc(p.resumen) + '</td></tr>').join('');
+  const v = document.getElementById('vacio');
+  v.hidden = lista.length > 0;
+  v.textContent = datos.length ? 'Ningún prospecto coincide con el filtro.' : 'Todavía no hay prospectos registrados. Aparecen aquí a medida que escriben al WhatsApp.';
+}
+function resumen() {
+  const cuenta = {};
+  datos.forEach(p => { cuenta[p.etapa] = (cuenta[p.etapa] || 0) + 1; });
+  const orden = ['Nuevo', 'Interesado', 'Espera asesor', 'Llamada agendada', 'Cliente'];
+  document.getElementById('res').innerHTML = '<span class="chip' + (filtro ? '' : ' on') + '" data-e="">Todos <b>' + datos.length + '</b></span>' +
+    orden.map(e => '<span class="chip' + (filtro === e ? ' on' : '') + '" data-e="' + e + '">' + e + ' <b>' + (cuenta[e] || 0) + '</b></span>').join('');
+  document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filtro = c.dataset.e; resumen(); pintar(); });
+}
+async function cargar() {
+  if (!PASS) { const v = document.getElementById('vacio'); v.hidden = false; v.innerHTML = 'Primero entra a <a href="/">la bandeja</a> con tu clave y luego vuelve a esta página.'; return; }
+  try {
+    const r = await fetch('/api/prospectos', { headers: { 'x-inbox-pass': PASS } });
+    if (r.status === 401) { const v = document.getElementById('vacio'); v.hidden = false; v.innerHTML = 'La clave guardada no es válida. Vuelve a entrar por <a href="/">la bandeja</a>.'; return; }
+    const d = await r.json();
+    datos = d.prospectos || [];
+    resumen(); pintar();
+  } catch (e) { const v = document.getElementById('vacio'); v.hidden = false; v.textContent = 'No se pudo cargar el registro. Intenta de nuevo.'; }
+}
+document.getElementById('q').oninput = pintar;
+cargar(); setInterval(cargar, 60000);
+</script>
+</body>
+</html>

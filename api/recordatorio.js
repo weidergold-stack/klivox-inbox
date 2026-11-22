@@ -1,25 +1,33 @@
-// api/recordatorio.js — recordatorio de la llamada, 1 hora antes
+// api/recordatorio.js — mensajes ligados a una llamada agendada
 //
-// Lo llama el reloj del script "Agenda Klivox" (Google Apps Script) cuando una
-// "Llamada Klivox" esta a una hora de empezar. Este archivo decide COMO enviarlo:
+// Lo llama el reloj del script "Agenda Klivox" (Google Apps Script):
 //
-//  - Si la persona escribio en las ultimas 24 h  -> mensaje de texto normal.
-//  - Si no                                        -> plantilla aprobada por Meta
-//    (WhatsApp no deja enviar texto libre fuera de esa ventana).
+//  tipo 'antes' (por defecto): 1 hora antes de la llamada. Le escribe a la persona y,
+//                              aparte, le manda al equipo por Telegram la ficha del prospecto.
+//  tipo 'post':                despues de la llamada, para preguntar como le fue.
 //
-// La plantilla se busca por nombre en Twilio, asi no hay que configurar su id:
-// en cuanto Meta la aprueba, empieza a usarse sola.
+// Regla de WhatsApp: fuera de las 24 h desde el ultimo mensaje de la persona solo se
+// puede enviar una plantilla aprobada. Por eso:
+//   - si la plantilla con botones esta aprobada, se usa siempre;
+//   - si no, dentro de las 24 h va texto normal y fuera va la plantilla de texto aprobada.
+// Las plantillas se buscan por nombre: en cuanto Meta aprueba una, empieza a usarse sola.
 //
-// Requiere env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, AGENDA_CLAVE.
-// Opcional: KV_REST_API_URL / KV_REST_API_TOKEN (evita recordatorios repetidos).
+// Requiere env: TWILIO_*, AGENDA_CLAVE. Opcional: KV_* (evita repetidos), TELEGRAM_* (avisos).
 
-const PLANTILLA = 'klivox_recordatorio_llamada';
-const BOT_MARK = '​'; // la misma marca invisible de api/webhook.js
+const C = require('../lib/comun');
+
 const VENTANA_MS = 23 * 60 * 60 * 1000; // 23 h: una hora de margen sobre las 24 de WhatsApp
 
-const texto = (nombre, hora) =>
-  'Hola ' + nombre + ' 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las ' + hora +
-  '. Te llamaremos a este mismo número. Si necesitas cambiarla o cancelarla, respóndenos por aquí.';
+const TEXTO = {
+  antes: (n, h) => 'Hola ' + n + ' 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las ' + h +
+    '. Te llamaremos a este mismo número. Si necesitas cambiarla o cancelarla, respóndenos por aquí.',
+  post: (n) => 'Hola ' + n + ' 👋 Gracias por tu interés en Klivox. ¿Cómo te fue en la llamada con nuestro asesor? ' +
+    'Si te quedó alguna duda o quieres avanzar, respóndenos por aquí.'
+};
+const PLANTILLAS = {
+  antes: ['klivox_recordatorio_llamada_botones', 'klivox_recordatorio_llamada'],
+  post: ['klivox_despues_llamada']
+};
 
 module.exports = async (req, res) => {
   const fin = (code, obj) => res.status(code).json(obj);
@@ -27,80 +35,67 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return fin(405, { ok: false, motivo: 'metodo' });
     let b = req.body || {};
     if (typeof b === 'string') { try { b = JSON.parse(b); } catch (_) { b = {}; } }
+    if (!process.env.AGENDA_CLAVE || b.clave !== process.env.AGENDA_CLAVE) return fin(401, { ok: false, motivo: 'no_autorizado' });
+    if (!C.twilio()) return fin(200, { ok: false, motivo: 'twilio_sin_config' });
 
-    const CLAVE = process.env.AGENDA_CLAVE;
-    if (!CLAVE || b.clave !== CLAVE) return fin(401, { ok: false, motivo: 'no_autorizado' });
-
-    const SID = process.env.TWILIO_ACCOUNT_SID;
-    const TOKEN = process.env.TWILIO_AUTH_TOKEN;
-    const FROM = process.env.TWILIO_WHATSAPP_FROM;
-    if (!SID || !TOKEN || !FROM) return fin(200, { ok: false, motivo: 'twilio_sin_config' });
-
+    const tipo = b.tipo === 'post' ? 'post' : 'antes';
     const digitos = String(b.telefono || '').replace(/\D/g, '');
     if (digitos.length < 10) return fin(200, { ok: false, motivo: 'telefono_invalido' });
     const to = 'whatsapp:+' + digitos;
-    const nombre = (String(b.nombre || '').trim().split(/\s+/)[0] || 'hola').slice(0, 40);
     const hora = String(b.hora || '').trim().slice(0, 20);
-    if (!hora) return fin(200, { ok: false, motivo: 'falta_hora' });
+    if (tipo === 'antes' && !hora) return fin(200, { ok: false, motivo: 'falta_hora' });
 
-    // Candado contra repetidos: un solo recordatorio por numero y por horario.
-    const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
-    const llave = 'klivox_recordado:' + digitos.slice(-10) + ':' + String(b.inicio || hora).replace(/[^0-9T]/g, '');
-    const kv = async (ruta) => {
-      if (!KU || !KT) return null;
-      const r = await fetch(KU + ruta, { method: 'POST', headers: { Authorization: 'Bearer ' + KT } });
-      const d = await r.json();
-      return d ? d.result : null;
-    };
-    try {
-      if ((await kv('/get/' + encodeURIComponent(llave))) === '1') return fin(200, { ok: true, ya_enviado: true });
-    } catch (_) {}
+    // El mensaje de despues de la llamada no se envia de noche: espera a la manana siguiente.
+    if (tipo === 'post') {
+      const ahora = C.bogota();
+      if (ahora.hora < 8 || ahora.hora >= 19) return fin(200, { ok: false, motivo: 'fuera_de_horario' });
+    }
 
-    const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
-    const base = 'https://api.twilio.com/2010-04-01/Accounts/' + SID + '/Messages.json';
+    // Un solo mensaje de cada tipo por numero y por horario.
+    const llave = 'klivox_recordado:' + tipo + ':' + digitos.slice(-10) + ':' + String(b.inicio || hora).replace(/[^0-9T]/g, '');
+    if ((await C.kvGet(llave)) === '1') return fin(200, { ok: true, ya_enviado: true });
+
+    const lead = (await C.leerLead(to)) || { tel: '+' + digitos, seguimientos: [], enviados: [] };
+    const nombre = C.nombreCorto(lead) || C.nombreCorto({ nombre: b.nombre }) || 'qué tal';
 
     // ¿Escribio la persona en las ultimas 24 h?
     let dentro = false;
     try {
-      const lr = await fetch(base + '?PageSize=1&From=' + encodeURIComponent(to), { headers: { Authorization: auth } });
+      const t = C.twilio();
+      const lr = await fetch(t.mensajes + '?PageSize=1&From=' + encodeURIComponent(to), { headers: { Authorization: t.auth } });
       const ld = await lr.json();
       const m = (ld.messages || [])[0];
       const ts = m && (m.date_sent || m.date_created);
       if (ts) dentro = (Date.now() - new Date(ts).getTime()) < VENTANA_MS;
     } catch (_) { dentro = false; }
 
-    const params = new URLSearchParams({ From: FROM, To: to });
-    let via;
-    if (dentro) {
-      params.set('Body', texto(nombre, hora) + BOT_MARK);
-      via = 'texto';
+    const pl = await C.plantillas();
+    const aprobada = (n) => (pl[n] && pl[n].aprobada) ? pl[n].sid : '';
+    const vars = tipo === 'antes' ? { 1: nombre, 2: hora } : { 1: nombre };
+    const conBotones = tipo === 'antes' ? aprobada(PLANTILLAS.antes[0]) : '';
+
+    let envio, via;
+    if (conBotones) {
+      envio = await C.enviarWhatsApp({ to, contentSid: conBotones, variables: vars }); via = 'plantilla_botones';
+    } else if (dentro) {
+      envio = await C.enviarWhatsApp({ to, body: (tipo === 'antes' ? TEXTO.antes(nombre, hora) : TEXTO.post(nombre)) + C.BOT_MARK }); via = 'texto';
     } else {
-      // Fuera de la ventana: solo sirve una plantilla aprobada.
-      let sid = '';
-      try {
-        const cr = await fetch('https://content.twilio.com/v1/ContentAndApprovals?PageSize=100', { headers: { Authorization: auth } });
-        const cd = await cr.json();
-        const c = (cd.contents || []).find(x =>
-          x.friendly_name === PLANTILLA && String((x.approval_requests || {}).status || '').toLowerCase() === 'approved');
-        if (c) sid = c.sid;
-      } catch (_) {}
+      const sid = PLANTILLAS[tipo].map(aprobada).find(Boolean);
       if (!sid) return fin(200, { ok: false, motivo: 'sin_plantilla_aprobada' });
-      params.set('ContentSid', sid);
-      params.set('ContentVariables', JSON.stringify({ 1: nombre, 2: hora }));
-      via = 'plantilla';
+      envio = await C.enviarWhatsApp({ to, contentSid: sid, variables: vars }); via = 'plantilla';
     }
+    if (!envio.ok) return fin(200, { ok: false, motivo: 'twilio_rechazo', detalle: envio.error });
 
-    const sr = await fetch(base, {
-      method: 'POST',
-      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    });
-    const sd = await sr.json().catch(() => ({}));
-    if (!sr.ok || !sd.sid) {
-      return fin(200, { ok: false, motivo: 'twilio_rechazo', detalle: String(sd.message || sr.status).slice(0, 200) });
+    await C.kvSet(llave, '1', 172800);
+    lead.enviados = (lead.enviados || []).concat(envio.sid).slice(-20);
+    lead.ultimoOut = Date.now();
+    await C.guardarLead(lead);
+
+    // Aviso al equipo con la ficha, para que el asesor llegue preparado a la llamada.
+    if (tipo === 'antes') {
+      await C.avisar('📞 Llamada en 1 hora (' + hora + ')' + C.NL + C.fichaTexto(lead) + C.NL +
+        (lead.confirmo ? '✅ Ya confirmó.' : '⏳ Aún no confirma.') + C.NL + 'Abrir: ' + C.BASE_PUBLICA);
     }
-
-    try { await kv('/set/' + encodeURIComponent(llave) + '/1/EX/172800'); } catch (_) {}
     return fin(200, { ok: true, via });
   } catch (e) {
     return fin(200, { ok: false, motivo: 'error', detalle: String((e && e.message) || e).slice(0, 200) });

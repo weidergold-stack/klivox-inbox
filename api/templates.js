@@ -10,14 +10,31 @@ module.exports = async (req, res) => {
   if (!SID || !TOKEN) { res.status(200).json({ templates: [], error: 'Faltan credenciales' }); return; }
   const auth = 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64');
 
-  // POST { crear: 'recordatorio_llamada' } -> crea la plantilla del recordatorio de la
-  // llamada y la envia a aprobacion de WhatsApp. Solo crea ESA plantilla, con texto fijo;
-  // no acepta texto libre. Si ya existe, no la duplica: devuelve su estado.
+  // POST { crear: '<clave>' } -> crea una de las plantillas FIJAS de abajo y la envia a
+  // aprobacion de WhatsApp. No acepta texto libre. Si ya existe, no la duplica.
   if (req.method === 'POST') {
     let b = req.body || {};
     if (typeof b === 'string') { try { b = JSON.parse(b); } catch (_) { b = {}; } }
-    if (b.crear !== 'recordatorio_llamada') { res.status(400).json({ ok: false, error: 'plantilla_desconocida' }); return; }
-    const NOMBRE = 'klivox_recordatorio_llamada';
+    const FIJAS = {
+      recordatorio_llamada: {
+        nombre: 'klivox_recordatorio_llamada', categoria: 'UTILITY', variables: { 1: 'Weider', 2: '7:30 p. m.' },
+        types: { 'twilio/text': { body: 'Hola {{1}} 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las {{2}}. Te llamaremos a este mismo número. Si necesitas cambiarla o cancelarla, respóndenos por aquí.' } }
+      },
+      recordatorio_botones: {
+        nombre: 'klivox_recordatorio_llamada_botones', categoria: 'UTILITY', variables: { 1: 'Weider', 2: '7:30 p. m.' },
+        types: { 'twilio/quick-reply': {
+          body: 'Hola {{1}} 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las {{2}}. Te llamaremos a este mismo número. ¿Sigue en pie?',
+          actions: [{ title: 'Confirmo', id: 'confirmo' }, { title: 'Cambiar hora', id: 'cambiar' }, { title: 'Cancelar', id: 'cancelar' }]
+        } }
+      },
+      despues_llamada: {
+        nombre: 'klivox_despues_llamada', categoria: 'UTILITY', variables: { 1: 'Weider' },
+        types: { 'twilio/text': { body: 'Hola {{1}} 👋 Gracias por tu interés en Klivox. ¿Cómo te fue en la llamada con nuestro asesor? Si te quedó alguna duda o quieres avanzar, respóndenos por aquí.' } }
+      }
+    };
+    const F = FIJAS[b.crear];
+    if (!F) { res.status(400).json({ ok: false, error: 'plantilla_desconocida' }); return; }
+    const NOMBRE = F.nombre;
     const jh = { Authorization: auth, 'Content-Type': 'application/json' };
     try {
       const lr = await fetch('https://content.twilio.com/v1/ContentAndApprovals?PageSize=100', { headers: { Authorization: auth } });
@@ -27,12 +44,7 @@ module.exports = async (req, res) => {
       if (!c) {
         const cr = await fetch('https://content.twilio.com/v1/Content', {
           method: 'POST', headers: jh,
-          body: JSON.stringify({
-            friendly_name: NOMBRE,
-            language: 'es',
-            variables: { 1: 'Weider', 2: '7:30 p. m.' },
-            types: { 'twilio/text': { body: 'Hola {{1}} 👋 Te recordamos tu llamada con un asesor de Klivox hoy a las {{2}}. Te llamaremos a este mismo número. Si necesitas cambiarla o cancelarla, respóndenos por aquí.' } }
-          })
+          body: JSON.stringify({ friendly_name: NOMBRE, language: 'es', variables: F.variables, types: F.types })
         });
         c = await cr.json();
         if (!cr.ok || !c.sid) { res.status(200).json({ ok: false, paso: 'crear', detalle: String(c.message || cr.status).slice(0, 300) }); return; }
@@ -43,7 +55,7 @@ module.exports = async (req, res) => {
       if (creada || estado === 'unsubmitted') {
         const ar = await fetch('https://content.twilio.com/v1/Content/' + c.sid + '/ApprovalRequests/whatsapp', {
           method: 'POST', headers: jh,
-          body: JSON.stringify({ name: NOMBRE, category: 'UTILITY' })
+          body: JSON.stringify({ name: NOMBRE, category: F.categoria })
         });
         const ad = await ar.json().catch(() => ({}));
         enviada = ar.ok;
