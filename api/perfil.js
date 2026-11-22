@@ -46,6 +46,18 @@ module.exports = async (req, res) => {
     if (!s) { res.status(200).json({ ok: false, error: 'remitente_no_encontrado', total: lista.length }); return; }
 
     if (req.method !== 'POST') {
+      // ?detalle=1: datos tecnicos de la linea (cuenta de WhatsApp Business, tipo de cuenta, calidad y limite).
+      if (req.query && req.query.detalle) {
+        const c = s.configuration || {}, pr = s.properties || {};
+        res.status(200).json({
+          ok: true, estado: s.status, numero: s.sender_id, remitentes_en_la_cuenta: lista.length,
+          waba_id: c.waba_id || null, tipo_de_cuenta: c.account_type || null,
+          calidad: pr.quality_rating || null, limite_de_mensajes: pr.messaging_limit || null,
+          campos_configuracion: Object.keys(c), campos_propiedades: Object.keys(pr),
+          otros_remitentes: lista.filter(x => x.sid !== s.sid).map(x => ({ numero: x.sender_id, estado: x.status }))
+        });
+        return;
+      }
       res.status(200).json({ ok: true, estado: s.status, perfil: solo(s.profile) });
       return;
     }
