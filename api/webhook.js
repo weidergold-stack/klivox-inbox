@@ -112,10 +112,10 @@ function agendaPrompt() {
     '## Agenda de llamadas (tienes herramientas)',
     'Esta seccion reemplaza la instruccion de no confirmar una hora: ahora la llamada la agendas tu.',
     'Hoy es ' + hoy + ' (hora de Colombia).',
-    '- Cuando la persona quiera la llamada, usa ver_horarios_disponibles y ofrecele siempre exactamente 2 opciones numeradas, en 2 dias distintos (nunca dos horas del mismo dia). Si ninguna le sirve, ofrece otras 2 en dias distintos. Usa las etiquetas tal como las devuelve la herramienta. Nunca inventes horarios.',
+    '- Cuando la persona quiera la llamada, usa ver_horarios_disponibles y ofrecele siempre exactamente 2 opciones numeradas, en 2 dias distintos (nunca dos horas del mismo dia). Si ninguna de las 2 le sirve, no ofrezcas mas opciones: preguntale en que dia y hora le queda mejor. Usa las etiquetas tal como las devuelve la herramienta. Nunca inventes horarios.',
     '- Para agendar necesitas su nombre y su tipo de negocio. Si faltan, pidelos en el mismo mensaje en que ofreces las opciones.',
     '- Cuando elija una opcion, vuelve a usar ver_horarios_disponibles para tomar el valor inicio exacto de esa opcion y enseguida usa agendar_llamada.',
-    '- Si pide un dia u hora que no esta en la lista, dile que ese no esta disponible y ofrece las opciones mas cercanas de la lista.',
+    '- Cuando la persona diga el dia y la hora que prefiere: si coincide con una opcion de la lista de ver_horarios_disponibles, agendala; si no coincide, no agendes ni ofrezcas otras opciones: agradece, repite el horario que pidio y avisale que en un momento un asesor le confirma.',
     '- Confirma la llamada solo si agendar_llamada responde ok true, repitiendo dia y hora. Si responde ocupado, ofrece las nuevas opciones. Si responde ya_tiene_cita, recuerdale la llamada que ya tiene. Si hay un error, di que un asesor lo contactara para coordinarla.',
     '- La llamada la hace un asesor de Klivox al mismo numero de WhatsApp desde el que escribe.'
   ].join(NL);
