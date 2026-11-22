@@ -226,7 +226,8 @@ module.exports = async (req, res) => {
     const windowMs = HUMAN_WINDOW_MIN * 60 * 1000;
     const recentHumanOutbound = msgs.some(m => {
       const isOut = (m.direction || '').startsWith('outbound');
-      const isBot = (m.body || '').includes(BOT_MARK);
+      // El recordatorio por plantilla no lleva la marca invisible: se reconoce por su texto.
+      const isBot = (m.body || '').includes(BOT_MARK) || (m.body || '').includes('Te recordamos tu llamada con un asesor de Klivox');
       const ts = m.date_sent || m.date_created;
       const t = ts ? new Date(ts).getTime() : 0;
       return isOut && !isBot && (now - t) < windowMs;
