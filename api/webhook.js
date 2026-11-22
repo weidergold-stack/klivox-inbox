@@ -60,21 +60,13 @@ Sitio web klivox.co, correo info@klivox.co y esta misma linea de WhatsApp.
 - Manten cada respuesta enfocada, util y orientada a avanzar hacia la llamada o hacia el registro de la prueba.`;
 // ============================================================================
 
-// Aviso por Telegram: te llega a tu Telegram personal cada vez que entra un mensaje.
+// Avisos por Telegram. Solo hay dos motivos: (1) escriben en un chat con el bot en pausa y
+// (2) el bot pasa el caso a un asesor o hay novedad de una llamada (ver el final del handler).
 // Requiere env TELEGRAM_TOKEN y TELEGRAM_CHAT_ID (opcionales; si faltan, no hace nada).
-async function notifyTelegram(fromNum, text) {
-  const TG = process.env.TELEGRAM_TOKEN;
-  const CHAT = process.env.TELEGRAM_CHAT_ID;
-  if (!TG || !CHAT) return;
-  const preview = (text || '').slice(0, 300) || '(sin texto / adjunto)';
-  const msg = '🔔 Nuevo mensaje en tu bandeja Klivox\n\n👤 ' + fromNum + '\n💬 ' + preview + '\n\nAbrir: https://klivox-inbox.vercel.app';
-  try {
-    await fetch('https://api.telegram.org/bot' + TG + '/sendMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CHAT, text: msg, disable_web_page_preview: true })
-    });
-  } catch (_) {}
+async function notifyTelegram(fromNum, text, lead) {
+  const quien = lead && (lead.nombre || lead.perfil) ? (lead.nombre || lead.perfil) + ' · ' : '';
+  const preview = (text || '').slice(0, 300) || '(sin texto: envió un adjunto)';
+  await C.avisar('⏸️ Escribieron en un chat con el bot en pausa' + NL + NL + '👤 ' + quien + fromNum + NL + '💬 ' + preview + NL + NL + 'Abrir: ' + C.BASE_PUBLICA);
 }
 
 // ============================================================================
@@ -365,8 +357,6 @@ module.exports = async (req, res) => {
     }
     await C.guardarLead(lead);
 
-    // Aviso a Telegram (si esta configurado)
-    await notifyTelegram(from.replace('whatsapp:', ''), (esNuevo && lead.anuncio && lead.anuncio.titulo ? '[Llego por el anuncio: ' + lead.anuncio.titulo + '] ' : '') + body);
 
     // Interruptor de pausa (Redis/Upstash).
     // Regla (la misma de api/bot-state.js): lo que se elige en un chat manda sobre el global;
@@ -382,7 +372,11 @@ module.exports = async (req, res) => {
         const v = (pd && pd.result) || [];
         const own = v[0] === '1' || v[0] === '0';
         const paused = own ? v[0] === '1' : v[1] === '1';
-        if (paused) return done();
+        if (paused) {
+          // Aviso al equipo: escribieron en un chat que el bot NO esta atendiendo.
+          await notifyTelegram(from.replace('whatsapp:', ''), body, lead);
+          return done();
+        }
       }
     } catch (_) {}
 

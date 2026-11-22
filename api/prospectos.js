@@ -23,6 +23,7 @@ module.exports = async (req, res) => {
         confirmo: !!l.confirmo,
         anuncio: (l.anuncio && l.anuncio.titulo) || '',
         resumen: l.resumen || '',
+        falla: (l.falla && l.falla.motivo) || '',
         mensajes: l.mensajes || 0,
         primer: l.primer || 0,
         ultimo: l.ultimoIn || 0,

@@ -70,7 +70,7 @@ function pintar() {
     '<td>' + (p.anuncio ? esc(p.anuncio) : '<span class="mut">Directo</span>') + '</td>' +
     '<td>' + esc(cuando(p.ultimo)) + '<div class="mut">Primer contacto: ' + esc(cuando(p.primer)) + '</div></td>' +
     '<td>' + esc(SEG[p.seguimiento] || p.seguimiento) + '<div class="mut">Enviados: ' + p.seguimientos + ' de 2</div></td>' +
-    '<td class="mut" style="max-width:320px">' + esc(p.resumen) + '</td></tr>').join('');
+    '<td class="mut" style="max-width:320px">' + esc(p.resumen) + (p.falla ? '<div style="color:#fb7185">Último envío no entregado: ' + esc(p.falla) + '</div>' : '') + '</td></tr>').join('');
   const v = document.getElementById('vacio');
   v.hidden = lista.length > 0;
   v.textContent = datos.length ? 'Ningún prospecto coincide con el filtro.' : 'Todavía no hay prospectos registrados. Aparecen aquí a medida que escriben al WhatsApp.';

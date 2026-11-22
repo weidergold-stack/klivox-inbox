@@ -102,9 +102,6 @@ module.exports = async (req, res) => {
       hechos.push({ tel: lead.tel, plantilla: nombrePl });
     }
 
-    if (!simular && hechos.length) {
-      await C.avisar('🔄 Seguimiento automático enviado a ' + hechos.length + ' prospecto(s):' + C.NL + hechos.map(h => '· ' + h.tel + ' (' + h.plantilla + ')').join(C.NL));
-    }
     res.status(200).json({ ok: true, simular, prospectos: leads.length, enviados: simular ? 0 : hechos.length, lista: hechos, saltados });
   } catch (e) {
     res.status(200).json({ ok: false, error: String((e && e.message) || e).slice(0, 200) });

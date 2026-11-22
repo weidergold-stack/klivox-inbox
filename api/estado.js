@@ -31,9 +31,12 @@ module.exports = async (req, res) => {
     }
     const codigo = String(p.ErrorCode || '');
     const lead = p.To ? await C.leerLead(p.To) : null;
-    await C.avisar('⚠️ Mensaje NO entregado a ' + String(p.To || '').replace('whatsapp:', '') +
-      (lead && (lead.nombre || lead.perfil) ? ' (' + (lead.nombre || lead.perfil) + ')' : '') + C.NL +
-      'Motivo: ' + (MOTIVOS[codigo] || p.ErrorMessage || 'sin detalle') + (codigo ? ' [código ' + codigo + ']' : ''));
+    // No se avisa por Telegram (el equipo pidio solo dos tipos de aviso). La falla queda
+    // anotada en la ficha del prospecto y se ve en la pagina de prospectos.
+    if (lead) {
+      lead.falla = { ts: Date.now(), motivo: (MOTIVOS[codigo] || String(p.ErrorMessage || 'sin detalle')).slice(0, 160), codigo };
+      await C.guardarLead(lead);
+    }
     return done();
   } catch (_) {
     return done();
