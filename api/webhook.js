@@ -80,13 +80,21 @@ module.exports = async (req, res) => {
     // Aviso a Telegram (si esta configurado)
     await notifyTelegram(from.replace('whatsapp:', ''), body);
 
-    // Interruptor de pausa (Redis/Upstash): si esta pausado, el bot no responde.
+    // Interruptor de pausa (Redis/Upstash).
+    // Regla (la misma de api/bot-state.js): lo que se elige en un chat manda sobre el global;
+    // un chat sin eleccion propia sigue al interruptor global.
+    // La llave del chat usa los ultimos 10 digitos, asi coincide aunque el numero
+    // este guardado con o sin +57 en la bandeja.
     try {
       const KU = process.env.KV_REST_API_URL, KT = process.env.KV_REST_API_TOKEN;
       if (KU && KT) {
-        const pr = await fetch(`${KU}/get/klivox_bot_paused`, { headers: { Authorization: `Bearer ${KT}` } });
+        const chatKey = 'klivox_paused:' + from.replace(/\D/g, '').slice(-10);
+        const pr = await fetch(`${KU}/mget/${encodeURIComponent(chatKey)}/klivox_bot_paused`, { headers: { Authorization: `Bearer ${KT}` } });
         const pd = await pr.json();
-        if (pd && pd.result === '1') return done();
+        const v = (pd && pd.result) || [];
+        const own = v[0] === '1' || v[0] === '0';
+        const paused = own ? v[0] === '1' : v[1] === '1';
+        if (paused) return done();
       }
     } catch (_) {}
 
