@@ -31,6 +31,73 @@ async function allZavuContacts() {
   return out;
 }
 
+// Al ENCENDER el bot en un chat: si el paciente tiene mensajes sin contestar (lo ultimo
+// del chat es suyo y es de las ultimas 23 horas, dentro de la ventana de WhatsApp), se le
+// pasan a Lia para que arranque de una vez. Sin esto el bot solo reaccionaria cuando el
+// paciente vuelva a escribir. Devuelve cuantos mensajes se le pasaron.
+async function retomar(number, convId) {
+  if (!BS.liaReady()) return 0;
+  const cfgRaw = await BS.pipeline([['GET', 'botcfg:' + BS.NS]]);
+  let enabled = false;
+  try { enabled = !!JSON.parse((cfgRaw && cfgRaw[0]) || '{}').enabled; } catch (_) {}
+  if (!enabled) return 0; // con el bot general apagado Lia no podria responder
+
+  const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER;
+  if (!KEY) return 0;
+  const H = { Authorization: 'Bearer ' + KEY };
+  if (SENDER) H['Zavu-Sender'] = SENDER;
+  const id = BS.chatId(number);
+  const Z = 'https://api.zavu.dev/v1';
+
+  let cid = String(convId || '').trim();
+  if (!cid) {
+    const cr = await fetch(Z + '/conversations?limit=100', { headers: H });
+    if (!cr.ok) return 0;
+    const cd = await cr.json().catch(() => ({}));
+    const conv = ((cd && cd.items) || []).find(c => BS.chatId(c.contactIdentifier) === id);
+    cid = (conv && conv.id) || '';
+  }
+  if (!cid) return 0;
+  const mr = await fetch(Z + '/conversations/' + encodeURIComponent(cid) + '/messages?limit=100', { headers: H });
+  if (!mr.ok) return 0;
+  const md = await mr.json().catch(() => ({}));
+  const all = ((md && md.items) || [])
+    .map(m => ({
+      id: m.id || '',
+      mine: BS.chatId(m.from) === id,
+      text: String(m.text || '').replace('\u200B', '').trim(),
+      at: m.createdAt || null,
+      t: m.createdAt ? Date.parse(m.createdAt) : 0
+    }))
+    .filter(m => m.t)
+    .sort((a, b) => a.t - b.t);
+  // Seguridad: que la conversacion sea de verdad la de este contacto.
+  if (!all.some(m => m.mine)) return 0;
+
+  // Lo ultimo del chat que escribio el paciente y nadie contesto.
+  let i = all.length;
+  while (i > 0 && all[i - 1].mine) i--;
+  const limite = Date.now() - 23 * 60 * 60 * 1000;
+  const pend = all.slice(i).filter(m => m.text && m.id && m.t > limite);
+  if (!pend.length) return 0;
+
+  const first = await BS.pipeline([['SADD', BS.K_LIA, id]]);
+  const isFirst = !!(first && Number(first[0]) === 1);
+  const previo = isFirst
+    ? all.slice(0, i).filter(m => m.text).slice(-20).map(m => ({ rol: m.mine ? 'paciente' : 'equipo', texto: m.text.slice(0, 1500), fecha: m.at }))
+    : undefined;
+
+  let n = 0;
+  for (let k = 0; k < pend.length; k++) {
+    const extra = { texto: pend[k].text, messageId: pend[k].id, fecha: pend[k].at };
+    if (k === 0 && previo && previo.length) extra.previo = previo;
+    const r = await BS.lia('entrante', number, extra, 15000);
+    if (r && r.ok !== false && r.guardado) n++;
+    else if (!r || r.ok === false) { if (isFirst && n === 0) await BS.pipeline([['SREM', BS.K_LIA, id]]); break; }
+  }
+  return n;
+}
+
 module.exports = async (req, res) => {
   const pass = req.headers['x-inbox-pass'] || '';
   if (!process.env.INBOX_PASSWORD || pass !== process.env.INBOX_PASSWORD) {
@@ -57,7 +124,10 @@ module.exports = async (req, res) => {
         if (!ok) return res.status(500).json({ error: 'kv_error' });
         // Lia se entera de que le devolvieron o le quitaron el chat.
         try { if (await BS.liaKnows(b.number)) await BS.lia(on ? 'bot_on' : 'bot_off', b.number, null, 4000); } catch (_) {}
-        return res.status(200).json({ ok: true, number: b.number, on, paused: !on });
+        // Recien encendido: Lia retoma lo que el paciente dejo sin contestar.
+        let retomados = 0;
+        if (on) { try { retomados = await retomar(b.number, b.convId); } catch (_) {} }
+        return res.status(200).json({ ok: true, number: b.number, on, paused: !on, retomados });
       }
 
       const val = b.paused ? '1' : '0';

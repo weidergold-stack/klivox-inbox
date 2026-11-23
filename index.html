@@ -379,9 +379,10 @@ async function toggleChatBot(num){
   var want=!chatBotOn(num);
   window.__botBusy=1;if(b)b.disabled=true;
   try{
-    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,on:want})});
+    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,on:want,convId:((convs[num]&&convs[num].msgs&&convs[num].msgs[0])||{}).convId||''})});
     const d=await r.json().catch(function(){return {};});
-    if(r.ok&&d.ok){if(want)botOnSet[botId(num)]=1;else delete botOnSet[botId(num)];window.__botSig=null;renderConvs();}
+    if(r.ok&&d.ok){if(want)botOnSet[botId(num)]=1;else delete botOnSet[botId(num)];window.__botSig=null;renderConvs();
+      if(want&&d.retomados>0){var _w=document.getElementById('winWarn');if(_w){_w.textContent='🤖 Lia va a responder lo que el paciente dejó sin contestar ('+d.retomados+(d.retomados===1?' mensaje':' mensajes')+'). Tarda cerca de un minuto.';_w.style.display='block';setTimeout(function(){renderThread(num);},9000);}}}
     else{document.getElementById('sendErr').textContent='No se pudo cambiar el bot en este chat. Intenta de nuevo.';}
   }catch(e){document.getElementById('sendErr').textContent='No se pudo cambiar el bot en este chat. Intenta de nuevo.';}
   window.__botBusy=0;if(b)b.disabled=false;
