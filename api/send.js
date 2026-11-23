@@ -83,27 +83,83 @@ module.exports = async (req, res) => {
   const headers = { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
   if (SENDER) headers['Zavu-Sender'] = SENDER;
 
-  try {
-    const r = await fetch('https://api.zavu.dev/v1/messages', {
-      method: 'POST', headers, body: JSON.stringify(payload)
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      const err = (d && (d.message || (d.error && d.error.message))) || 'error';
-      const code = d && (d.code || (d.error && d.error.code));
-      res.status(200).json({ ok: false, error: err, code }); return;
-    }
-    // Alguien del equipo escribio desde la bandeja: el bot se apaga en ese chat
-    // y el contacto queda con historial (no vuelve a contar como "nuevo").
+  // Clave de idempotencia: una sola por pedido. Si hay que reintentar, Zavu
+  // reconoce que es el MISMO mensaje y no lo manda dos veces (responde 409).
+  payload.idempotencyKey = 'inbox-' + require('crypto').randomUUID();
+
+  // Errores pasajeros de Zavu que se resuelven reintentando: choque de escrituras
+  // simultaneas en la misma conversacion ("changed while it was being run"),
+  // caidas 5xx y cortes de red. No son errores del mensaje.
+  const esPasajero = (status, msg) =>
+    status >= 500 || status === 0 ||
+    /changed while it was being run|optimistic concurrency|try again|timeout|timed out/i.test(msg || '');
+  const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const PAUSAS = [500, 1500]; // 3 intentos en total
+
+  // Ultimo recurso: confirmar en Zavu si el mensaje SI quedo registrado aunque
+  // la respuesta haya sido un error (asi no se le pide al equipo reenviarlo).
+  const yaSalio = async (desde) => {
     try {
-      const BS = require('../lib/botstate');
-      await BS.humanTookOver(to);
-      // Si Lia venia atendiendo ese chat, se le avisa para que ceda el caso
-      // (sin esto le haria seguimiento a un paciente que ya atiende una persona).
-      if (await BS.liaKnows(to)) await BS.lia('humano', to, { texto: text || (contentSid ? '(plantilla enviada por el equipo)' : '(archivo enviado por el equipo)') }, 4000);
-    } catch (_) {}
-    res.status(200).json({ ok: true, id: (d && (d.id || (d.message && d.message.id))) || null });
-  } catch (e) {
-    res.status(200).json({ ok: false, error: String(e) });
+      const h = { Authorization: 'Bearer ' + KEY };
+      if (SENDER) h['Zavu-Sender'] = SENDER;
+      const lr = await fetch('https://api.zavu.dev/v1/messages?limit=30', { headers: h });
+      if (!lr.ok) return null;
+      const ld = await lr.json().catch(() => ({}));
+      const dig = to.replace(/\D/g, '');
+      const hit = ((ld && ld.items) || []).find((m) => {
+        if ((m.to || '').replace(/\D/g, '') !== dig) return false;
+        const t = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+        if (!t || t < desde - 5000) return false;
+        if (contentSid) return m.messageType === 'template';
+        if (mediaUrl) return ((m.content || {}).mediaUrl || '') === mediaUrl;
+        return (m.text || '').trim() === text;
+      });
+      return hit ? (hit.id || true) : null;
+    } catch (_) { return null; }
+  };
+
+  const inicio = Date.now();
+  let okId = null, enviado = false, err = 'error', code;
+  for (let intento = 0; intento <= PAUSAS.length; intento++) {
+    let status = 0, d = {};
+    try {
+      const r = await fetch('https://api.zavu.dev/v1/messages', {
+        method: 'POST', headers, body: JSON.stringify(payload)
+      });
+      status = r.status;
+      d = await r.json().catch(() => ({}));
+      if (r.ok) { enviado = true; okId = (d && (d.id || (d.message && d.message.id))) || null; break; }
+      // 409 en un reintento = la clave ya existe = el intento anterior SI entro.
+      if (status === 409 && intento > 0) { enviado = true; break; }
+      err = (d && (d.message || (d.error && d.error.message))) || ('HTTP ' + status);
+      code = d && (d.code || (d.error && d.error.code));
+    } catch (e) {
+      err = String(e);
+    }
+    if (!esPasajero(status, err) || intento === PAUSAS.length) break;
+    await espera(PAUSAS[intento]);
   }
+
+  if (!enviado && esPasajero(0, err)) {
+    const hit = await yaSalio(inicio);
+    if (hit) { enviado = true; okId = hit === true ? null : hit; }
+  }
+
+  if (!enviado) {
+    if (/changed while it was being run/i.test(err)) {
+      err = 'Zavu estaba ocupado con este chat. Antes de reenviar, revisa si el mensaje ya aparece arriba en la conversación.';
+    }
+    res.status(200).json({ ok: false, error: err, code }); return;
+  }
+
+  // Alguien del equipo escribio desde la bandeja: el bot se apaga en ese chat
+  // y el contacto queda con historial (no vuelve a contar como "nuevo").
+  try {
+    const BS = require('../lib/botstate');
+    await BS.humanTookOver(to);
+    // Si Lia venia atendiendo ese chat, se le avisa para que ceda el caso
+    // (sin esto le haria seguimiento a un paciente que ya atiende una persona).
+    if (await BS.liaKnows(to)) await BS.lia('humano', to, { texto: text || (contentSid ? '(plantilla enviada por el equipo)' : '(archivo enviado por el equipo)') }, 4000);
+  } catch (_) {}
+  res.status(200).json({ ok: true, id: okId });
 };
