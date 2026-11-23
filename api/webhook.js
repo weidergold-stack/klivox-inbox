@@ -251,7 +251,10 @@ module.exports = async (req, res) => {
     // El encendido/apagado del bot vive en la configuracion (ver mas abajo).
 
     const ev = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    if (!ev || ev.type !== 'message.inbound') return done(); // ignora eventos de entrega, etc.
+    // El nombre del evento llega en `event` (webhook de proyecto, API v2: ahi `type` es el canal)
+    // o en `type` (webhook del remitente, API v1).
+    const evName = ev ? (ev.event === 'message.inbound' || ev.type === 'message.inbound' ? 'message.inbound' : '') : '';
+    if (evName !== 'message.inbound') return done(); // ignora eventos de entrega, etc.
 
     const data = ev.data || {};
     const from = (data.from || '').trim();     // numero del paciente
@@ -291,7 +294,10 @@ module.exports = async (req, res) => {
       const mediaUrl = String(ct.mediaUrl || data.mediaUrl || '').trim();
       const msgId = String(data.id || data.messageId || data.message_id || ev.id || '').trim()
         || ('t:' + id + ':' + Math.floor(Date.now() / 30000) + ':' + body.length);
-      const base = { texto: body, messageId: msgId, fecha: data.createdAt || ev.createdAt || null };
+      // La hora real del mensaje: v2 la manda en milisegundos (providerTimestamp / timestamp).
+      const tsNum = Number(data.providerTimestamp || ev.timestamp || 0);
+      const fechaMsg = data.createdAt || ev.createdAt || (tsNum > 0 ? new Date(tsNum < 1e12 ? tsNum * 1000 : tsNum).toISOString() : null);
+      const base = { texto: body, messageId: msgId, fecha: fechaMsg };
       if (/^https?:\/\//i.test(mediaUrl)) base.media = { url: mediaUrl, mimeType: ct.mimeType || data.mimeType || '' };
 
       // Bot apagado (en el chat o en general): Lia no responde, pero si ya conoce
