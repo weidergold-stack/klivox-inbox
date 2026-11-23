@@ -55,6 +55,8 @@ module.exports = async (req, res) => {
         const on = (typeof b.on === 'boolean') ? b.on : !b.paused;
         const ok = await BS.setOn(b.number, on);
         if (!ok) return res.status(500).json({ error: 'kv_error' });
+        // Lia se entera de que le devolvieron o le quitaron el chat.
+        try { if (await BS.liaKnows(b.number)) await BS.lia(on ? 'bot_on' : 'bot_off', b.number, null, 4000); } catch (_) {}
         return res.status(200).json({ ok: true, number: b.number, on, paused: !on });
       }
 
@@ -66,6 +68,7 @@ module.exports = async (req, res) => {
     const q = req.query || {};
     if (q.list) {
       const st = await BS.listOn();
+      st.lia = BS.liaReady(); // true = responde Lia; false = el bot sencillo del panel
       return res.status(200).json(st);
     }
     if (q.number) {

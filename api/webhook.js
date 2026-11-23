@@ -9,6 +9,12 @@
 //      Se apaga solo en un chat cuando alguien del equipo responde desde la bandeja
 //      o cuando el paciente pide hablar con una persona.
 //
+// QUIEN RESPONDE: con PUENTE_SECRET configurado responde LIA, el mismo bot que
+// atiende en el CRM (agenda, reprograma y cancela en las agendas reales). La
+// bandeja le pasa el mensaje (POST <LIA_URL>/api/zavu) y Lia devuelve la respuesta
+// llamando a este mismo archivo con { type:'lia.send' } y el secreto en la cabecera
+// x-puente-secret. Sin PUENTE_SECRET responde el bot sencillo del panel (guion).
+//
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), ANTHROPIC_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN
 
 const HUMAN_WINDOW_MIN = 3;
@@ -145,8 +151,102 @@ function today5() {
   return new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+// Tipo de mensaje de Zavu segun la extension del archivo.
+function mediaType(url) {
+  const u = String(url || '').split('?')[0].toLowerCase();
+  if (/\.(jpe?g|png|webp|gif)$/.test(u)) return 'image';
+  if (/\.(mp4|mov|m4v|3gp)$/.test(u)) return 'video';
+  if (/\.(mp3|ogg|oga|opus|m4a|aac|wav)$/.test(u)) return 'audio';
+  return 'document';
+}
+
+// LIA responde: sale por Zavu, pero solo si el bot sigue encendido en ese chat.
+async function liaSend(req, res) {
+  const out = (o) => res.status(200).json(o);
+  try {
+    const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    if (b.type !== 'lia.send') return out({ ok: false, error: 'tipo desconocido' });
+    const to = BS.canon(b.to);
+    const text = String(b.text || '').trim();
+    const media = (Array.isArray(b.media) ? b.media : []).filter(u => /^https:\/\//i.test(String(u || ''))).slice(0, 5);
+    if (!to || (!text && !media.length)) return out({ ok: false, error: 'faltan datos' });
+
+    const cfg = await loadCfg();
+    if (!cfg.enabled) return out({ ok: false, error: 'bot general apagado' });
+    if (!(await BS.isOn(to))) return out({ ok: false, error: 'bot apagado en este chat' });
+
+    const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER;
+    if (!KEY) return out({ ok: false, error: 'falta ZAVU_API_KEY' });
+    const zh = { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+    if (SENDER) zh['Zavu-Sender'] = SENDER;
+    const post = async (payload) => {
+      const r = await fetch(ZAVU + '/messages', { method: 'POST', headers: zh, body: JSON.stringify(payload) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) return null;
+      return String((d && (d.message || (d.error && d.error.message) || d.error)) || ('HTTP ' + r.status)).slice(0, 200);
+    };
+
+    let err = null, sent = 0;
+    if (text) {
+      err = await post({ to, channel: 'whatsapp', text: text + BOT_MARK });
+      if (err) return out({ ok: false, error: err });
+      sent++;
+    }
+    for (const url of media) {
+      const type = mediaType(url);
+      const content = { mediaUrl: url };
+      if (type === 'document') { try { content.filename = decodeURIComponent(url.split('/').pop().split('?')[0]); } catch (_) {} }
+      const e = await post({ to, channel: 'whatsapp', messageType: type, content });
+      if (e) err = e; else sent++;
+    }
+    if (!sent) return out({ ok: false, error: err || 'no salio nada' });
+    return out({ ok: true, sent, mediaError: err || undefined });
+  } catch (e) {
+    return out({ ok: false, error: String((e && e.message) || e).slice(0, 200) });
+  }
+}
+
+// Lo que se hablo en el chat antes de que entrara Lia (para que no llegue en blanco).
+async function previousMessages(id, zh, curId, curText) {
+  const H = { Authorization: zh.Authorization };
+  if (zh['Zavu-Sender']) H['Zavu-Sender'] = zh['Zavu-Sender'];
+  try {
+    const cr = await fetch(ZAVU + '/conversations?limit=100', { headers: H });
+    if (!cr.ok) return [];
+    const cd = await cr.json();
+    const conv = ((cd && cd.items) || []).find(c => BS.chatId(c.contactIdentifier) === id);
+    if (!conv || !conv.id) return [];
+    const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(conv.id) + '/messages?limit=100', { headers: H });
+    if (!mr.ok) return [];
+    const md = await mr.json();
+    const now = Date.now();
+    return ((md && md.items) || [])
+      .map(m => {
+        const mine = BS.chatId(m.from) === id;
+        const t = m.createdAt ? Date.parse(m.createdAt) : 0;
+        let text = String(m.text || '').replace(BOT_MARK, '').trim();
+        if (!text && m.messageType && m.messageType !== 'text') text = '[' + m.messageType + ']';
+        return { id: m.id || '', rol: mine ? 'paciente' : 'equipo', texto: text, fecha: m.createdAt || null, t };
+      })
+      .filter(m => m.texto && m.t)
+      // fuera el mensaje que se esta entregando ahora mismo
+      .filter(m => !(curId && m.id === curId))
+      .filter(m => !(m.rol === 'paciente' && curText && m.texto === curText && (now - m.t) < 90000))
+      .sort((a, b) => a.t - b.t)
+      .slice(-20)
+      .map(m => ({ rol: m.rol, texto: m.texto.slice(0, 1500), fecha: m.fecha }));
+  } catch (_) { return []; }
+}
+
 module.exports = async (req, res) => {
   const done = () => res.status(200).json({ ok: true });
+  // Llamada de Lia (no de Zavu): trae el secreto del puente. Falla cerrado.
+  if (req.headers && req.headers['x-puente-secret'] !== undefined) {
+    if (!process.env.PUENTE_SECRET || req.headers['x-puente-secret'] !== process.env.PUENTE_SECRET) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+    return liaSend(req, res);
+  }
   try {
     // El encendido/apagado del bot vive en la configuracion (ver mas abajo).
 
@@ -182,11 +282,44 @@ module.exports = async (req, res) => {
       if (hist === null) { await BS.pipeline([['SREM', BS.K_KNOWN, id]]); return done(); } // se reintenta en su proximo mensaje
       if (!hist) { await BS.setOn(from, true); botOn = true; }
     }
-    if (!botOn) return done();           // bot apagado en este chat => atencion manual
-    if (!body) return done();            // por ahora solo responde texto
-
     // ---- Configuracion del bot (panel de la bandeja) ----
     const cfg = await loadCfg();
+
+    // ---- Responde LIA (puente configurado) ----
+    if (BS.liaReady()) {
+      const ct = data.content || {};
+      const mediaUrl = String(ct.mediaUrl || data.mediaUrl || '').trim();
+      const msgId = String(data.id || data.messageId || data.message_id || ev.id || '').trim()
+        || ('t:' + id + ':' + Math.floor(Date.now() / 30000) + ':' + body.length);
+      const base = { texto: body, messageId: msgId, fecha: data.createdAt || ev.createdAt || null };
+      if (/^https?:\/\//i.test(mediaUrl)) base.media = { url: mediaUrl, mimeType: ct.mimeType || data.mimeType || '' };
+
+      // Bot apagado (en el chat o en general): Lia no responde, pero si ya conoce
+      // el chat se le guarda lo que escribio el paciente para que no pierda el hilo.
+      if (!botOn || !cfg.enabled) {
+        if (body && await BS.liaKnows(from)) await BS.lia('contexto', from, base, 5000);
+        return done();
+      }
+      if (!body && !base.media) return done();
+
+      const first = await BS.pipeline([['SADD', BS.K_LIA, id]]);
+      const isFirst = !!(first && Number(first[0]) === 1);
+      const extra = Object.assign({}, base);
+      if (isFirst) extra.previo = await previousMessages(id, zh, msgId, body);
+      let r = await BS.lia('entrante', from, extra, 20000);
+      if (!r || r.ok === false) r = await BS.lia('entrante', from, extra, 20000); // un reintento
+      if (!r || r.ok === false) {
+        if (isFirst) await BS.pipeline([['SREM', BS.K_LIA, id]]); // la proxima vez se manda otra vez el historial
+        return done();
+      }
+      // Lia paso el caso a una persona: el bot queda apagado en ese chat.
+      if (r.porPersona) await BS.setOn(from, false);
+      return done();
+    }
+
+    // ---- Bot sencillo del panel (sin puente) ----
+    if (!botOn) return done();           // bot apagado en este chat => atencion manual
+    if (!body) return done();            // por ahora solo responde texto
     if (!cfg.enabled) return done();   // bot apagado => atencion 100% manual
     const SYS = buildSystem(cfg);
     if (!SYS.trim()) return done();    // sin guion => no responde

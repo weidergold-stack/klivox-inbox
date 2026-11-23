@@ -95,7 +95,13 @@ module.exports = async (req, res) => {
     }
     // Alguien del equipo escribio desde la bandeja: el bot se apaga en ese chat
     // y el contacto queda con historial (no vuelve a contar como "nuevo").
-    try { await require('../lib/botstate').humanTookOver(to); } catch (_) {}
+    try {
+      const BS = require('../lib/botstate');
+      await BS.humanTookOver(to);
+      // Si Lia venia atendiendo ese chat, se le avisa para que ceda el caso
+      // (sin esto le haria seguimiento a un paciente que ya atiende una persona).
+      if (await BS.liaKnows(to)) await BS.lia('humano', to, { texto: text || (contentSid ? '(plantilla enviada por el equipo)' : '(archivo enviado por el equipo)') }, 4000);
+    } catch (_) {}
     res.status(200).json({ ok: true, id: (d && (d.id || (d.message && d.message.id))) || null });
   } catch (e) {
     res.status(200).json({ ok: false, error: String(e) });
