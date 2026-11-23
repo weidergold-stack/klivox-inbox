@@ -66,6 +66,21 @@ module.exports = async (req, res) => {
     }
 
     const q = req.query || {};
+    if (q.puente) {
+      // Diagnostico: ¿el secreto de la bandeja y el de Lia son el mismo? No guarda ni envia nada.
+      // Lia contesta 401 si el secreto no coincide y 400 ("evento desconocido") si si coincide.
+      if (!BS.liaReady()) return res.status(200).json({ configurado: false });
+      let status = 0;
+      try {
+        const r = await fetch((process.env.LIA_URL || 'https://cita.kromagrupo.com').replace(/\/+$/, '') + '/api/zavu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-puente-secret': process.env.PUENTE_SECRET },
+          body: JSON.stringify({ evento: 'ping', de: '+570000000000' })
+        });
+        status = r.status;
+      } catch (_) {}
+      return res.status(200).json({ configurado: true, status, coincide: status === 400 });
+    }
     if (q.list) {
       const st = await BS.listOn();
       st.lia = BS.liaReady(); // true = responde Lia; false = el bot sencillo del panel
