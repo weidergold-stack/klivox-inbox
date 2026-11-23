@@ -1,9 +1,13 @@
-// api/webhook.js — Bot de auto-respuesta (Zavu / WhatsApp Cloud API) para la instancia de Tania.
+// api/webhook.js — Bot de auto-respuesta (Zavu / WhatsApp Cloud API) de la bandeja del Dr. Weider.
 //
-// ESTADO: INACTIVO por diseño. El guion (SYSTEM_PROMPT) esta vacio a proposito:
-// la Dra. Tania atiende manual desde la bandeja. La infraestructura del bot queda lista;
-// para activarlo en el futuro basta con escribir el guion en SYSTEM_PROMPT (abajo) y
-// desplegar: el bot empezara a responder automaticamente con relevo humano y pausa.
+// Tres condiciones para que el bot responda un mensaje:
+//   1) Interruptor general encendido y guion cargado (panel "Bot" de la bandeja).
+//   2) Los chats que ya existian fueron marcados como conocidos (botseeded).
+//   3) El bot esta encendido EN ESE CHAT (ver lib/botstate.js):
+//        - contacto que escribe por primera vez, sin historial  -> encendido solo
+//        - cualquier chat que ya existia                        -> apagado, se enciende a mano
+//      Se apaga solo en un chat cuando alguien del equipo responde desde la bandeja
+//      o cuando el paciente pide hablar con una persona.
 //
 // Env: ZAVU_API_KEY, ZAVU_SENDER (opcional), ANTHROPIC_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN
 
@@ -12,6 +16,48 @@ const HISTORY_MAX = 12;
 const MODEL = 'claude-haiku-4-5-20251001';
 const BOT_MARK = '​'; // marca invisible: distingue respuestas del bot de las manuales
 const ZAVU = 'https://api.zavu.dev/v1';
+const NEW_CHAT_MIN = 60; // un chat sigue siendo "nuevo" si sus unicos mensajes son del paciente y de la ultima hora
+const BS = require('../lib/botstate');
+
+// ¿El contacto ya tenia historial en Zavu? true / false, o null si no se pudo consultar.
+// Historial = cualquier mensaje enviado por nosotros, o un mensaje suyo de hace mas de NEW_CHAT_MIN.
+async function hasHistory(id, zh) {
+  const H = { Authorization: zh.Authorization };
+  if (zh['Zavu-Sender']) H['Zavu-Sender'] = zh['Zavu-Sender'];
+  const isOld = (m, mine) => {
+    if (!mine) return true; // mensaje saliente hacia el contacto
+    const ts = m.createdAt ? Date.parse(m.createdAt) : 0;
+    return !!ts && (Date.now() - ts) > NEW_CHAT_MIN * 60 * 1000;
+  };
+  let checked = false;
+  try {
+    // 1) Su conversacion (acaba de escribir, asi que esta entre las mas recientes).
+    const cr = await fetch(ZAVU + '/conversations?limit=100', { headers: H });
+    if (cr.ok) {
+      const cd = await cr.json();
+      const conv = ((cd && cd.items) || []).find(c => BS.chatId(c.contactIdentifier) === id);
+      if (conv && conv.id) {
+        const mr = await fetch(ZAVU + '/conversations/' + encodeURIComponent(conv.id) + '/messages?limit=100', { headers: H });
+        if (mr.ok) {
+          const md = await mr.json();
+          checked = true;
+          if (((md && md.items) || []).some(m => isOld(m, BS.chatId(m.from) === id))) return true;
+        }
+      }
+    }
+  } catch (_) {}
+  try {
+    // 2) Registro general de la cuenta (ultimos mensajes), por si lo anterior no lo encontro.
+    const lr = await fetch(ZAVU + '/messages?limit=100', { headers: H });
+    if (lr.ok) {
+      const ld = await lr.json();
+      checked = true;
+      const mine = ((ld && ld.items) || []).filter(m => BS.chatId(m.from) === id || BS.chatId(m.to) === id);
+      if (mine.some(m => isOld(m, BS.chatId(m.from) === id))) return true;
+    }
+  } catch (_) {}
+  return checked ? false : null;
+}
 
 // ============================================================================
 // GUION DEL BOT: se configura desde el panel de la bandeja (boton Bot).
@@ -111,11 +157,7 @@ module.exports = async (req, res) => {
     const from = (data.from || '').trim();     // numero del paciente
     const body = (data.text || '').trim();
     const myNum = (data.to || '').replace(/\D/g, ''); // NUESTRO numero (el sender)
-    if (!from || !body) return done(); // por ahora solo texto
-
-    // Interruptor de pausa: global o por conversación (Redis), aislado por bandeja (INBOX_NS)
-    if ((await kvGet('botpaused:' + NS)) === '1') return done();
-    if ((await kvGet('paused:' + NS + ':' + from)) === '1') return done();
+    if (!from) return done();
 
     const KEY = process.env.ZAVU_API_KEY, SENDER = process.env.ZAVU_SENDER, AKEY = process.env.ANTHROPIC_API_KEY;
     if (!KEY) return done();
@@ -123,6 +165,25 @@ module.exports = async (req, res) => {
     if (SENDER) zh['Zavu-Sender'] = SENDER;
 
     const dig = from.replace(/\D/g, '');
+
+    // ---- Bot por chat (Redis, aislado por bandeja) ----
+    const id = BS.chatId(from);
+    if (!id) return done();
+    const st = await BS.pipeline([['GET', BS.K_GLOBAL_PAUSE], ['GET', BS.K_SEEDED]]);
+    if (!st) return done();              // sin Redis no se responde
+    if (st[0] === '1') return done();    // pausa global heredada
+    if (!st[1]) return done();           // aun no se marcaron los chats existentes: todo apagado
+    const kn = await BS.pipeline([['SADD', BS.K_KNOWN, id], ['SISMEMBER', BS.K_ON, id]]);
+    if (!kn) return done();
+    let botOn = Number(kn[1]) === 1;
+    if (Number(kn[0]) === 1) {
+      // Primera vez que vemos a este contacto: solo se enciende si de verdad no tiene historial.
+      const hist = await hasHistory(id, zh);
+      if (hist === null) { await BS.pipeline([['SREM', BS.K_KNOWN, id]]); return done(); } // se reintenta en su proximo mensaje
+      if (!hist) { await BS.setOn(from, true); botOn = true; }
+    }
+    if (!botOn) return done();           // bot apagado en este chat => atencion manual
+    if (!body) return done();            // por ahora solo responde texto
 
     // ---- Configuracion del bot (panel de la bandeja) ----
     const cfg = await loadCfg();
@@ -157,7 +218,7 @@ module.exports = async (req, res) => {
       const kws = String(cfg.escalate.keywords || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
       const low = body.toLowerCase();
       if (kws.some(k => low.indexOf(k) !== -1)) {
-        await kvSet('paused:' + NS + ':' + from, '1');
+        await BS.setOn(from, false);
         await kvSet('escalated:' + NS + ':' + dig, String(Date.now()));
         await sendText(cfg.escalate.msg);
         return done();

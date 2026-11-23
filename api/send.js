@@ -93,6 +93,9 @@ module.exports = async (req, res) => {
       const code = d && (d.code || (d.error && d.error.code));
       res.status(200).json({ ok: false, error: err, code }); return;
     }
+    // Alguien del equipo escribio desde la bandeja: el bot se apaga en ese chat
+    // y el contacto queda con historial (no vuelve a contar como "nuevo").
+    try { await require('../lib/botstate').humanTookOver(to); } catch (_) {}
     res.status(200).json({ ok: true, id: (d && (d.id || (d.message && d.message.id))) || null });
   } catch (e) {
     res.status(200).json({ ok: false, error: String(e) });

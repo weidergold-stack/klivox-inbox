@@ -67,6 +67,10 @@
   .conv .time{font-size:12px;color:var(--muted2);flex:0 0 auto}
   .conv .last{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
   .conv .dot{width:10px;height:10px;border-radius:50%;background:var(--green);flex:0 0 auto}
+  .botchip{flex:0 0 auto;font-size:11px;line-height:1;background:var(--greenL);border:1px solid var(--green);border-radius:10px;padding:2px 5px;margin-left:auto}
+  .botbtn{flex:0 0 auto;border:1px solid var(--line2);background:#fff;color:var(--muted);border-radius:16px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .botbtn.on{background:var(--greenL);color:var(--txt);border-color:var(--green)}
+  .botbtn:disabled{opacity:.55;cursor:default}
   .side-empty{padding:26px 22px;color:var(--muted);font-size:13px;text-align:center;line-height:1.7}
   .main{display:flex;flex-direction:column;min-height:0;background:var(--bg);background-image:radial-gradient(rgba(11,20,26,.035) 1px,transparent 1px);background-size:24px 24px}
   .main-h{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;background:var(--head);min-height:60px}
@@ -306,7 +310,7 @@ async function login(){
   document.getElementById('app').classList.remove('hidden');
   await load();loadMetaTemplates();loadUsage();renderSub();
   if(subDaysLeft()<=3) subAlertModal();
-  setInterval(load,5000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
+  setInterval(load,5000);loadBotStates();setInterval(loadBotStates,10000);setInterval(loadMetaTemplates,60000);setInterval(loadUsage,60000);setInterval(renderSub,3600000);
 }
 
 function fmtMoney(n){return '$'+(Number(n)||0).toFixed(2)}
@@ -333,15 +337,57 @@ async function loadUsage(){
   }catch(e){}
 }
 
+/* ───── Bot por chat ─────
+   botOnSet: chats con el bot encendido. Los chats que ya existian estan apagados;
+   un contacto nuevo sin historial entra encendido (lo decide el servidor). */
 let chatPaused={};
+let botOnSet={};
+function botId(n){return String(n||'').replace('whatsapp:','').replace(/[^0-9A-Za-z]/g,'').toLowerCase();}
+function chatBotOn(num){return !!botOnSet[botId(num)];}
+function paintChatBotBtn(){
+  var b=document.getElementById('chatBotBtn');if(!b||!current)return;
+  var on=chatBotOn(current);var gen=!!(window.BOTCFG&&window.BOTCFG.enabled);
+  b.className='botbtn'+(on?' on':'');
+  b.textContent=on?'🤖 Bot activo':'🤖 Bot apagado';
+  b.title=on?(gen?'El bot responde en este chat. Toca para apagarlo.':'Encendido en este chat, pero el bot general está apagado (botón Bot de arriba).'):'El bot no responde en este chat. Toca para encenderlo.';
+}
+async function loadBotStates(){
+  try{
+    const r=await fetch('/api/bot-state?list=1',{headers:hdr()});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(window.__botBusy)return;
+    const sig=(d.on||[]).slice().sort().join(',');
+    const nx={};(d.on||[]).forEach(function(x){nx[x]=1;});
+    botOnSet=nx;
+    if(sig!==window.__botSig){window.__botSig=sig;renderConvs();}
+    paintChatBotBtn();
+  }catch(e){}
+}
 async function loadChatBotState(num){
   try{
     const r=await fetch('/api/bot-state?number='+encodeURIComponent(num),{headers:hdr()});
     if(!r.ok)return;
     const d=await r.json();
     chatPaused[num]=!!d.paused;
+    if(d.on)botOnSet[botId(num)]=1;else delete botOnSet[botId(num)];
+    if(current===num)paintChatBotBtn();
   }catch(e){}
 }
+async function toggleChatBot(num){
+  var b=document.getElementById('chatBotBtn');
+  var want=!chatBotOn(num);
+  window.__botBusy=1;if(b)b.disabled=true;
+  try{
+    const r=await fetch('/api/bot-state',{method:'POST',headers:hdr(),body:JSON.stringify({number:num,on:want})});
+    const d=await r.json().catch(function(){return {};});
+    if(r.ok&&d.ok){if(want)botOnSet[botId(num)]=1;else delete botOnSet[botId(num)];window.__botSig=null;renderConvs();}
+    else{document.getElementById('sendErr').textContent='No se pudo cambiar el bot en este chat. Intenta de nuevo.';}
+  }catch(e){document.getElementById('sendErr').textContent='No se pudo cambiar el bot en este chat. Intenta de nuevo.';}
+  window.__botBusy=0;if(b)b.disabled=false;
+  paintChatBotBtn();
+}
+function botLocalOff(num){if(chatBotOn(num)){delete botOnSet[botId(num)];window.__botSig=null;renderConvs();paintChatBotBtn();}}
 
 async function loadMetaTemplates(){
   try{
@@ -389,7 +435,7 @@ function renderConvs(){
     const tm=last?fmtTime(last.date):'';
     return `<div class="conv ${current===c.num?'active':''}" onclick="open_('${c.num}')">
       <div class="av">${esc(initials(nameOf(c.num)))}</div>
-      <div class="meta"><div class="top"><span class="name">${esc(nameOf(c.num))}</span><span class="time">${tm}</span></div>
+      <div class="meta"><div class="top"><span class="name">${esc(nameOf(c.num))}</span>${chatBotOn(c.num)?'<span class="botchip" title="Bot activo en este chat">🤖</span>':''}<span class="time">${tm}</span></div>
       <div class="last">${prev}</div></div>
       ${unread?'<span class="dot"></span>':''}
     </div>`}).join('');
@@ -407,6 +453,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
     `<button class="back" onclick="backToList()" aria-label="Volver">←</button>
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
+     <button class="botbtn${chatBotOn(num)?' on':''}" id="chatBotBtn" onclick="toggleChatBot('${num}')">${chatBotOn(num)?'🤖 Bot activo':'🤖 Bot apagado'}</button>
      <button class="ico" title="Marcar como no leído" onclick="markUnread('${num}')">📩</button><button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
   const th=document.getElementById('thread');var _lm=c.msgs.length?c.msgs[c.msgs.length-1]:null;var _sig=num+'|'+c.msgs.length+'|'+(_lm?(_lm.id+'|'+_lm.date):'');var _skip=(th.getAttribute('data-sig')===_sig);if(!_skip)th.setAttribute('data-sig',_sig);
   if(!c.msgs.length){
@@ -480,7 +527,7 @@ var reactMap=JSON.parse(localStorage.getItem('kv_reactions')||'{}');function sav
   document.getElementById('sendErr').textContent='';ta.value='';
   const r=await fetch('/api/send',{method:'POST',headers:hdr(),body:JSON.stringify(Object.assign({to:current,body:text},replyTo?{replyToMessageId:replyTo.id}:{}))});clearReply();
   const d=await r.json();
-  if(!d.ok){document.getElementById('sendErr').textContent=d.code===63016?'Fuera de la ventana de 24 h: se requiere una plantilla aprobada.':('No se pudo enviar: '+(d.error||'error'));ta.value=text;}
+  if(!d.ok){document.getElementById('sendErr').textContent=d.code===63016?'Fuera de la ventana de 24 h: se requiere una plantilla aprobada.':('No se pudo enviar: '+(d.error||'error'));ta.value=text;}else{botLocalOff(current);}
   await load();loadUsage();
 }
 
@@ -788,7 +835,7 @@ function bcDefault(){return {enabled:false,persona:'',knowledge:'',hours:{enable
 async function bcLoad(){try{var r=await fetch('/api/bot-config',{headers:hdr()});var d=await r.json();window.BOTCFG=d&&d.cfg?d.cfg:bcDefault();}catch(e){window.BOTCFG=bcDefault();}
  var c=window.BOTCFG; if(!c.hours)c.hours=bcDefault().hours; if(!c.escalate)c.escalate=bcDefault().escalate; bcBadge();}
 async function bcSave(cfg){try{var r=await fetch('/api/bot-config',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({cfg:cfg})});var d=await r.json();return !!(d&&d.ok);}catch(e){return false;}}
-function bcBadge(){var b=document.getElementById('bcBtn');if(!b)return;var on=window.BOTCFG&&window.BOTCFG.enabled;b.textContent=on?'🤖 Bot ON':'🤖 Bot OFF';b.className='bcbtn'+(on?' on':'');}
+function bcBadge(){var b=document.getElementById('bcBtn');if(!b)return;var on=window.BOTCFG&&window.BOTCFG.enabled;b.textContent=on?'🤖 Bot ON':'🤖 Bot OFF';b.className='bcbtn'+(on?' on':'');if(typeof paintChatBotBtn==='function')paintChatBotBtn();}
 function bcButton(){
   if(document.getElementById('bcBtn'))return;
   var anchor=null;
