@@ -25,6 +25,7 @@ module.exports = async (req, res) => {
     // Solo pasan las dos acciones conocidas, con sus campos y nada mas.
     if (b.accion === 'interruptor' && typeof b.activo === 'boolean') cuerpo = { accion: 'interruptor', activo: b.activo };
     else if (b.accion === 'llamar' && typeof b.contactId === 'string') cuerpo = { accion: 'llamar', contactId: b.contactId.slice(0, 60) };
+    else if (b.accion === 'buscar' && typeof b.texto === 'string') cuerpo = { accion: 'buscar', texto: b.texto.slice(0, 60) };
     else { res.status(400).json({ ok: false, motivo: 'pedido no reconocido' }); return; }
   }
 
