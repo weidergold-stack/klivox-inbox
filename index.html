@@ -456,6 +456,52 @@ function renderConvs(){
 }
 
 async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{var cid=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])?convs[num].msgs[0].convId:'';var r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?'&c='+encodeURIComponent(cid):''),{headers:{'x-inbox-pass':PASS}});var d=await r.json();if(d&&d.messages&&d.messages.length){if(!convs[num])convs[num]={num,msgs:[]};convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}catch(e){}}
+// ---- Estado de entrega de cada mensaje enviado (viene de Zavu en /api/thread) ----
+// 🕓 en cola · ✓ enviado · ✓✓ entregado · ✓✓ azul leido · ⚠ no entregado
+function stTick(m){
+  if(!m||m.direction==='inbound'||!m.status)return '';
+  var s=m.status;
+  if(s==='read')return ' <span class="stk rd" title="Leído">✓✓</span>';
+  if(s==='delivered')return ' <span class="stk" title="Entregado">✓✓</span>';
+  if(s==='sent')return ' <span class="stk" title="Enviado, aún no entregado">✓</span>';
+  if(s==='failed')return ' <span class="stk fl" title="No entregado">⚠</span>';
+  if(s==='queued'||s==='sending'||s==='pending_url_verification')return ' <span class="stk" title="Enviando…">🕓</span>';
+  return '';
+}
+function stFail(m){
+  if(!m||m.direction==='inbound'||m.status!=='failed')return '';
+  var why=(m.err||'').trim()||'WhatsApp no lo pudo entregar';
+  return '<div class="stfail">⚠ No se entregó: '+esc(why)+(m.errCode?' (código '+esc(m.errCode)+')':'')+'</div>';
+}
+// Mientras el chat abierto tenga mensajes recientes sin estado final, se vuelve a
+// pedir el hilo para que los chulos avancen solos (enviado -> entregado -> leido).
+async function refreshStatuses(){
+  if(document.hidden||!current||window.__stBusy)return;
+  var num=current,c=convs[num];if(!c||!c.msgs||!c.msgs.length)return;
+  var now=Date.now();
+  var pend=c.msgs.some(function(m){return m.direction!=='inbound'&&m.status&&m.status!=='read'&&m.status!=='failed'&&(now-new Date(m.date).getTime())<6*36e5;});
+  if(!pend)return;
+  var cid='';for(var i=0;i<c.msgs.length;i++){if(c.msgs[i].convId){cid=c.msgs[i].convId;break;}}
+  if(!cid)return;
+  window.__stBusy=1;
+  try{
+    var r=await fetch('/api/thread?num='+encodeURIComponent(num)+'&c='+encodeURIComponent(cid),{headers:hdr()});
+    if(r.ok){
+      var d=await r.json();
+      var cur=convs[num];
+      if(d.messages&&d.messages.length&&cur&&d.messages.length>=cur.msgs.filter(function(x){return x.status;}).length){
+        // Solo se actualizan los estados de los mensajes que ya estan en pantalla.
+        var by={};d.messages.forEach(function(x){if(x.id)by[x.id]=x;});
+        var chg=false;
+        cur.msgs.forEach(function(x){var n=x.id&&by[x.id];if(n&&n.status&&(n.status!==x.status||n.err!==x.err)){x.status=n.status;x.err=n.err;x.errCode=n.errCode;chg=true;}});
+        if(chg&&current===num)renderThread(num);
+      }
+    }
+  }catch(_){}
+  window.__stBusy=0;
+}
+setInterval(refreshStatuses,10000);
+(function(){try{var st=document.createElement('style');st.textContent='.stk{font-size:11px;letter-spacing:-1px;color:#8696a0;margin-left:2px}.stk.rd{color:#53bdeb}.stk.fl{color:#d93025;letter-spacing:0}.stfail{margin-top:5px;padding:4px 7px;border-radius:6px;background:#fdecea;color:#b3261e;font-size:12px;line-height:1.35}';document.head.appendChild(st);}catch(e){}})();
 function backToList(){document.getElementById('app').classList.remove('show-thread');current=null;renderConvs();}
 
 function renderThread(num){var _th0=document.getElementById('thread');var _atBot=(!_th0)||((_th0.scrollHeight-_th0.scrollTop-_th0.clientHeight)<90);var _chgConv=(window.__thLast!==num);var _ta0=document.getElementById('reply');var _keep=_ta0?_ta0.value:'';window.__thLast=num;
@@ -468,7 +514,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
      <div class="av">${esc(initials(nameOf(num)))}</div>
      <div class="who"><div class="name">${esc(nameOf(num))}</div><div class="num">${esc(num)}</div></div>
      <button class="ico" title="Marcar como no leído" onclick="markUnread('${num}')">📩</button><button class="ico" title="Editar nombre" onclick="renameContact('${num}')">✎</button>`;
-  const th=document.getElementById('thread');var _lm=c.msgs.length?c.msgs[c.msgs.length-1]:null;var _sig=num+'|'+c.msgs.length+'|'+(_lm?(_lm.id+'|'+_lm.date):'');var _skip=(th.getAttribute('data-sig')===_sig);if(!_skip)th.setAttribute('data-sig',_sig);
+  const th=document.getElementById('thread');var _lm=c.msgs.length?c.msgs[c.msgs.length-1]:null;var _sig=num+'|'+c.msgs.length+'|'+(_lm?(_lm.id+'|'+_lm.date):'')+'|'+c.msgs.slice(-40).map(function(x){return (x.status||'-').charAt(0)+(x.status==='sent'?'1':'');}).join('');var _skip=(th.getAttribute('data-sig')===_sig);if(!_skip)th.setAttribute('data-sig',_sig);
   if(!c.msgs.length){
     th.innerHTML='<div style="margin:auto;color:#8a98b8;text-align:center;font-size:13.5px">Nuevo chat con '+esc(nameOf(num))+'.<br>Escribe el primer mensaje abajo.<br><span style="font-size:12px">(WhatsApp exige plantilla aprobada si el contacto no te ha escrito en 24 h.)</span></div>';
   }else{
@@ -480,7 +526,7 @@ function renderThread(num){var _th0=document.getElementById('thread');var _atBot
       } else if(m.type&&m.type!=='text'&&!m.body){media='<i>['+esc(m.type)+']</i>';}
       const bd=linkify(esc(m.body));
       const inner=media + (bd?((media?'<br>':'')+bd):(media?'':'<i>(sin texto)</i>'));
-      return `<div class="bub ${cls}">${(m.rtxt||m.rpid)?`<div class="qrep" style="border-left:2px solid var(--green);background:rgba(0,0,0,.05);border-radius:5px;padding:3px 7px;margin-bottom:4px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↩ ${esc(m.rtxt||'Mensaje citado')}</div>`:''}${inner}<span class="t">${fmtTime(m.date)}</span>${m.id?`<button class="rbtn" title="Responder" onclick="setReply('${m.id}')">↩</button>`:''}${m.id?`<button class="rbtn rbtn2" title="Reaccionar" onclick="openReact(event,'${m.id}')">🙂</button>`:''}${(m.id&&reactMap&&reactMap[m.id])?`<span class="rxbadge">${reactMap[m.id]}</span>`:''}</div>`}).join('');if(window.__thConv===num&&window.__thHtml&&_html.indexOf(window.__thHtml)===0){th.insertAdjacentHTML('beforeend',_html.slice(window.__thHtml.length));}else{th.innerHTML=_html;}window.__thHtml=_html;window.__thConv=num;}
+      return `<div class="bub ${cls}">${(m.rtxt||m.rpid)?`<div class="qrep" style="border-left:2px solid var(--green);background:rgba(0,0,0,.05);border-radius:5px;padding:3px 7px;margin-bottom:4px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">↩ ${esc(m.rtxt||'Mensaje citado')}</div>`:''}${inner}${stFail(m)}<span class="t">${fmtTime(m.date)}${stTick(m)}</span>${m.id?`<button class="rbtn" title="Responder" onclick="setReply('${m.id}')">↩</button>`:''}${m.id?`<button class="rbtn rbtn2" title="Reaccionar" onclick="openReact(event,'${m.id}')">🙂</button>`:''}${(m.id&&reactMap&&reactMap[m.id])?`<span class="rxbadge">${reactMap[m.id]}</span>`:''}</div>`}).join('');if(window.__thConv===num&&window.__thHtml&&_html.indexOf(window.__thHtml)===0){th.insertAdjacentHTML('beforeend',_html.slice(window.__thHtml.length));}else{th.innerHTML=_html;}window.__thHtml=_html;window.__thConv=num;}
   }
   if(_atBot||_chgConv){th.scrollTop=th.scrollHeight;}
   const inside=lastInbound(c)>0 && (Date.now()-lastInbound(c))/36e5<=24;
