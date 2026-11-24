@@ -47,6 +47,10 @@ module.exports = async (req, res) => {
       const inbound = !!(m.from && (m.from === contact || (cdig && norm(m.from) === cdig)));
       const ct = m.content || {};
       out.push({
+        convId: convId,                  // para refrescar el hilo sin volver a buscar la conversacion
+        status: m.status || '',          // queued | sending | sent | delivered | read | failed | received
+        err: m.errorMessage || '',       // motivo si Zavu/WhatsApp no pudo entregarlo
+        errCode: m.errorCode ? String(m.errorCode) : '',
         id: m.id || '',                 // ID Zavu del mensaje — necesario para responder citando (replyToMessageId)
         rpid: ct.replyToMessageId || '', // si este mensaje es una respuesta citada: ID del mensaje citado
         rtxt: ct.replyToText || '',      // texto (recorte) del mensaje citado
