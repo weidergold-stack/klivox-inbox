@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
     if (typeof b === 'string') { try { b = JSON.parse(b); } catch (_) { b = {}; } }
     b = b || {};
     // Solo pasan las dos acciones conocidas, con sus campos y nada mas.
-    if (b.accion === 'interruptor' && typeof b.activo === 'boolean') cuerpo = { accion: 'interruptor', activo: b.activo, cual: b.cual === 'reagendar' ? 'reagendar' : 'confirmacion' };
+    if (b.accion === 'interruptor' && typeof b.activo === 'boolean') cuerpo = { accion: 'interruptor', activo: b.activo, cual: /^[a-z_]{3,20}$/.test(String(b.cual || '')) ? b.cual : 'confirmacion' };
     else if (b.accion === 'llamar' && typeof b.contactId === 'string') cuerpo = { accion: 'llamar', contactId: b.contactId.slice(0, 60) };
     else if (b.accion === 'buscar' && typeof b.texto === 'string') cuerpo = { accion: 'buscar', texto: b.texto.slice(0, 60) };
     else { res.status(400).json({ ok: false, motivo: 'pedido no reconocido' }); return; }
