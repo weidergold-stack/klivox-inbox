@@ -425,7 +425,7 @@ async function load(){
       convs[other].msgs.push(m);
     }
     for(const num of contacts){ if(!convs[num]) convs[num]={num,msgs:[]}; }
-    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){var _c=window.__tc[_k];if(!_c||!_c.length){continue;}var _cl=_c[_c.length-1];if(!convs[_k]){convs[_k]={num:_k,msgs:_c};continue;}var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{convs[_k].msgs=_c;delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}
+    Object.values(convs).forEach(c=>c.msgs.sort((a,b)=>new Date(a.date)-new Date(b.date)));if(window.__tc){for(const _k in window.__tc){var _c=window.__tc[_k];if(!_c||!_c.length){continue;}var _cl=_c[_c.length-1];if(!convs[_k]){convs[_k]={num:_k,msgs:_c};continue;}var _nl=convs[_k].msgs[convs[_k].msgs.length-1];if(_cl&&_nl&&new Date(_nl.date)<=new Date(_cl.date)){convs[_k].msgs=_c;}else{convs[_k].msgs=_c.concat(convs[_k].msgs.filter(function(m){return new Date(m.date)>new Date(_cl.date);}));delete window.__tc[_k];if(current===_k&&typeof open_==='function'){open_(_k);}}}}
     if(current&&convs[current])markRead(current);
     renderConvs();
     if(current&&convs[current]){var _ms=convs[current].msgs||[];var _sig=_ms.length+'|'+((_ms[_ms.length-1]||{}).date||'')+'|'+((_ms[_ms.length-1]||{}).body||'').length;if(_sig!==window.__thSig){window.__thSig=_sig;renderThread(current);}}
@@ -455,7 +455,7 @@ function renderConvs(){
     </div>`}).join('');
 }
 
-async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{var cid=(convs[num]&&convs[num].msgs&&convs[num].msgs[0])?convs[num].msgs[0].convId:'';var r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?'&c='+encodeURIComponent(cid):''),{headers:{'x-inbox-pass':PASS}});var d=await r.json();if(d&&d.messages&&d.messages.length){if(!convs[num])convs[num]={num,msgs:[]};convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}catch(e){}}
+async function open_(num){current=num;markRead(num);renderConvs();document.getElementById('app').classList.add('show-thread');renderThread(num);loadChatBotState(num);try{var _mm=(convs[num]&&convs[num].msgs)||[];var cid=(_mm.length&&_mm[_mm.length-1].convId)||'';var r=await fetch('/api/thread?num='+encodeURIComponent(num)+(cid?'&c='+encodeURIComponent(cid):''),{headers:{'x-inbox-pass':PASS}});var d=await r.json();if(d&&d.messages&&d.messages.length){if(!convs[num])convs[num]={num,msgs:[]};convs[num].msgs=d.messages;window.__tc=window.__tc||{};window.__tc[num]=d.messages;if(current===num)renderThread(num);}}catch(e){}}
 // ---- Estado de entrega de cada mensaje enviado (viene de Zavu en /api/thread) ----
 // 🕓 en cola · ✓ enviado · ✓✓ entregado · ✓✓ azul leido · ⚠ no entregado
 function stTick(m){
